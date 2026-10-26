@@ -57,6 +57,7 @@ api/nbproject/private/
 
 # C++ & CMake (searchEngine/)
 searchEngine/build/
+searchEngine/build-fuzz/
 searchEngine/cmake-build-*/
 searchEngine/CMakeCache.txt
 searchEngine/CMakeFiles/
