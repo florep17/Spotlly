@@ -67,3 +67,26 @@ target_include_directories(spotly_tests
     include(GoogleTest)
     gtest_discover_tests(spotly_tests)
 endif()
+
+
+# Fuzz testing with libFuzzer
+option(SPOTLY_BUILD_FUZZ "Build fuzz tests" OFF)
+
+if(SPOTLY_BUILD_FUZZ)
+    add_executable(spotly_ranking_fuzz
+        ../tests/cpp_fuzz/RankingFuzz.cpp
+        src/Ranking.cpp
+    )
+
+    target_include_directories(spotly_ranking_fuzz
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+    target_compile_options(spotly_ranking_fuzz
+        PRIVATE -fsanitize=fuzzer,address
+    )
+
+    target_link_options(spotly_ranking_fuzz
+        PRIVATE -fsanitize=fuzzer,address
+    )
+endif()
