@@ -23,6 +23,11 @@ FetchContent_MakeAvailable(Crow)
 
 add_executable(spotly_search_engine
     src/main.cpp
+    src/Ranking.cpp
+)
+
+target_include_directories(spotly_search_engine
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(spotly_search_engine
@@ -44,9 +49,16 @@ if(SPOTLY_BUILD_TESTS)
 
     FetchContent_MakeAvailable(googletest)
 
-    add_executable(spotly_tests
-        tests/SearchEngineTest.cpp
-    )
+
+add_executable(spotly_tests
+    tests/SearchEngineTest.cpp
+    src/Ranking.cpp
+)
+
+target_include_directories(spotly_tests
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 
     target_link_libraries(spotly_tests
         PRIVATE GTest::gtest_main
