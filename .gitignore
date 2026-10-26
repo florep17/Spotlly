@@ -39,6 +39,8 @@ client/.expo-shared/
 client/dist/
 client/web-build/
 client/.claude/
+client/ios/
+client/android/
 
 # Java & Spring Boot (api/)
 api/target/

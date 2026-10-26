@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { ParkingSpot } from '../types/spot';
 import { bookingsService } from '../services/api/bookingsService';
 
@@ -8,6 +9,9 @@ interface BookingScreenProps {
   onBack: () => void;
   onBookingSuccess: () => void;
 }
+
+const garageHero = require('../../assets/garage_hero.png');
+const annaAvatar = require('../../assets/anna_avatar.png');
 
 export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBookingSuccess }) => {
   const [selectedDay, setSelectedDay] = useState(12);
@@ -46,27 +50,30 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Top Header Bar */}
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backText}>← Wróć do mapy</Text>
-          </TouchableOpacity>
-          <View style={styles.topActions}>
-            <TouchableOpacity style={styles.iconAction}>
-              <Text style={styles.actionIconText}>↗️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconAction}>
-              <Text style={styles.actionIconText}>🤍</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* Top Header Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.7}>
+          <Feather name="arrow-left" size={20} color="#111827" style={{ marginRight: 6 }} />
+          <Text style={styles.backText}>Wróć do mapy</Text>
+        </TouchableOpacity>
 
-        {/* Hero Image */}
+        <View style={styles.topActions}>
+          <TouchableOpacity style={styles.iconAction} activeOpacity={0.7}>
+            <Feather name="share-2" size={19} color="#111827" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconAction} activeOpacity={0.7}>
+            <Feather name="heart" size={19} color="#111827" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Hero Image with Camera Counter */}
         <View style={styles.heroContainer}>
-          <Image source={{ uri: spot.imageUrl }} style={styles.heroImage} />
+          <Image source={garageHero} style={styles.heroImage} resizeMode="cover" />
           <View style={styles.photoCounter}>
-            <Text style={styles.photoCounterText}>📷 1 / 3</Text>
+            <Feather name="camera" size={12} color="#ffffff" style={{ marginRight: 5 }} />
+            <Text style={styles.photoCounterText}>1 / 3</Text>
           </View>
         </View>
 
@@ -74,57 +81,73 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
         <View style={styles.detailsContent}>
           <View style={styles.badgeRow}>
             <Text style={styles.typeBadge}>PRYWATNY PARKING</Text>
-            <Text style={styles.ratingText}>
-              ⭐ {spot.rating} ({spot.reviewCount} opinie)
-            </Text>
+            <View style={styles.ratingBox}>
+              <Ionicons name="star" size={14} color="#1b5e3a" style={{ marginRight: 4 }} />
+              <Text style={styles.ratingText}>4,9 (32 opinie)</Text>
+            </View>
           </View>
 
-          <Text style={styles.title}>{spot.title}</Text>
-          <Text style={styles.address}>
-            📍 {spot.address}, {spot.city} · {spot.walkingMinutes} min pieszo
-          </Text>
+          <Text style={styles.title}>Garaż na Kazimierzu</Text>
+          <View style={styles.addressRow}>
+            <Ionicons name="location-sharp" size={14} color="#6b7280" style={{ marginRight: 4 }} />
+            <Text style={styles.address}>Dajwór 12, Kraków · 3 min pieszo</Text>
+          </View>
 
           {/* Feature Pills */}
           <View style={styles.featuresRow}>
-            {spot.isCovered && (
-              <View style={styles.featurePill}>
-                <Text style={styles.featurePillText}>🏠 Zadaszone</Text>
-              </View>
-            )}
-            {spot.isSecure && (
-              <View style={styles.featurePill}>
-                <Text style={styles.featurePillText}>🛡️ Bezpieczne</Text>
-              </View>
-            )}
-            {spot.fitsSuv && (
-              <View style={styles.featurePill}>
-                <Text style={styles.featurePillText}>🚗 Mieści SUV-a</Text>
-              </View>
-            )}
+            <View style={styles.featurePill}>
+              <Feather name="home" size={13} color="#1b5e3a" style={{ marginRight: 5 }} />
+              <Text style={styles.featurePillText}>Zadaszone</Text>
+            </View>
+            <View style={styles.featurePill}>
+              <Feather name="shield" size={13} color="#1b5e3a" style={{ marginRight: 5 }} />
+              <Text style={styles.featurePillText}>Bezpieczne</Text>
+            </View>
+            <View style={styles.featurePill}>
+              <Ionicons name="car-outline" size={14} color="#1b5e3a" style={{ marginRight: 5 }} />
+              <Text style={styles.featurePillText}>Mieści SUV-a</Text>
+            </View>
           </View>
 
-          {/* Host Card */}
+          {/* Host Card with Photo */}
           <View style={styles.hostCard}>
-            <View style={styles.hostAvatar}>
-              <Text style={styles.hostAvatarText}>{spot.hostName.charAt(0)}</Text>
-            </View>
+            <Image source={annaAvatar} style={styles.hostAvatarImage} />
             <View style={styles.hostInfo}>
               <View style={styles.hostHeader}>
-                <Text style={styles.hostName}>Gospodyni: {spot.hostName}</Text>
-                <Text style={styles.verifiedCheck}>✓</Text>
+                <Text style={styles.hostName}>Gospodyni: Anna</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color="#10b981"
+                  style={{ marginLeft: 6 }}
+                />
               </View>
               <Text style={styles.hostSub}>Zweryfikowana · Zwykle odpisuje w 1 godz.</Text>
             </View>
           </View>
 
-          <Text style={styles.description}>{spot.description}</Text>
+          <Text style={styles.description}>
+            Spokojny garaż z wygodnym wjazdem na krakowskim Kazimierzu. Instrukcje wjazdu otrzymasz
+            po rezerwacji.
+          </Text>
 
           {/* Date Selector Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Wybierz termin</Text>
-            <Text style={styles.sectionPrice}>{spot.hourlyPrice.toFixed(0)} zł / godz.</Text>
+            <Text style={styles.sectionPrice}>5 zł / godz.</Text>
           </View>
-          <Text style={styles.monthLabel}>Październik 2026</Text>
+
+          <View style={styles.monthRow}>
+            <Text style={styles.monthLabel}>Październik 2026</Text>
+            <View style={styles.monthArrows}>
+              <TouchableOpacity style={styles.arrowButton}>
+                <Feather name="chevron-left" size={16} color="#374151" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.arrowButton}>
+                <Feather name="chevron-right" size={16} color="#374151" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <ScrollView
             horizontal
@@ -138,6 +161,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
                   key={item.date}
                   style={[styles.dayCard, isSelected && styles.selectedDayCard]}
                   onPress={() => setSelectedDay(item.date)}
+                  activeOpacity={0.8}
                 >
                   <Text style={[styles.dayLabel, isSelected && styles.selectedDayText]}>
                     {item.day}
@@ -154,42 +178,57 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
           <View style={styles.timeRow}>
             <View style={styles.timeBox}>
               <Text style={styles.timeBoxLabel}>Przyjazd</Text>
-              <Text style={styles.timeBoxValue}>10:00 ▾</Text>
+              <View style={styles.timeValueRow}>
+                <Text style={styles.timeBoxValue}>10:00</Text>
+                <Feather name="chevron-down" size={16} color="#6b7280" />
+              </View>
             </View>
+
             <View style={styles.timeBox}>
               <Text style={styles.timeBoxLabel}>Wyjazd</Text>
-              <Text style={styles.timeBoxValue}>13:00 ▾</Text>
+              <View style={styles.timeValueRow}>
+                <Text style={styles.timeBoxValue}>13:00</Text>
+                <Feather name="chevron-down" size={16} color="#6b7280" />
+              </View>
             </View>
           </View>
 
           <View style={styles.cancellationNotice}>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={16}
+              color="#059669"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.cancellationText}>
-              ✓ Bezpłatne anulowanie do 1 godz. przed przyjazdem
+              Bezpłatne anulowanie do 1 godz. przed przyjazdem
             </Text>
           </View>
         </View>
       </ScrollView>
 
       {/* Bottom Booking Action Bar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.priceSummary}>
-          <Text style={styles.calculationFormula}>3 godz. × {spot.hourlyPrice.toFixed(0)} zł</Text>
-          <Text style={styles.serviceFeeNote}>W tym 2 zł opłaty serwisowej</Text>
+      <View style={styles.bottomBarContainer}>
+        <View style={styles.priceSummaryRow}>
+          <View style={styles.priceSummary}>
+            <Text style={styles.calculationFormula}>3 godz. × 5 zł</Text>
+            <Text style={styles.serviceFeeNote}>W tym 2 zł opłaty serwisowej</Text>
+          </View>
+          <View style={styles.totalBlock}>
+            <Text style={styles.totalPrice}>Razem 17 zł</Text>
+          </View>
         </View>
-        <View style={styles.totalBlock}>
-          <Text style={styles.totalPrice}>Razem 17 zł</Text>
-        </View>
-      </View>
 
-      <View style={styles.buttonWrapper}>
         <TouchableOpacity
           style={[styles.bookButton, isSubmitting && styles.buttonDisabled]}
           onPress={handleBooking}
           disabled={isSubmitting}
+          activeOpacity={0.85}
         >
           <Text style={styles.bookButtonText}>
-            {isSubmitting ? 'Przetwarzanie...' : 'Zarezerwuj i zapłać ➔'}
+            {isSubmitting ? 'Przetwarzanie...' : 'Zarezerwuj i zapłać'}
           </Text>
+          <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>
     </View>
@@ -202,39 +241,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 130,
   },
   topBar: {
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingTop: 52,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#ffffff',
   },
   backButton: {
-    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   backText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#111827',
   },
   topActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   iconAction: {
-    padding: 6,
-  },
-  actionIconText: {
-    fontSize: 18,
+    padding: 4,
   },
   heroContainer: {
     width: '100%',
-    height: 220,
-    backgroundColor: '#e5e7eb',
+    height: 230,
+    backgroundColor: '#f3f4f6',
     position: 'relative',
   },
   heroImage: {
@@ -243,32 +281,38 @@ const styles = StyleSheet.create({
   },
   photoCounter: {
     position: 'absolute',
-    bottom: 12,
-    right: 14,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    bottom: 14,
+    right: 16,
+    backgroundColor: 'rgba(17, 24, 39, 0.75)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
+    paddingVertical: 5,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   photoCounterText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   detailsContent: {
-    padding: 18,
+    padding: 20,
   },
   badgeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   typeBadge: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#1b5e3a',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
+  },
+  ratingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   ratingText: {
     fontSize: 13,
@@ -276,27 +320,33 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   address: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#6b7280',
-    marginBottom: 14,
   },
   featuresRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   featurePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f3f4f6',
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   featurePillText: {
     fontSize: 12,
@@ -306,24 +356,16 @@ const styles = StyleSheet.create({
   hostCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
   },
-  hostAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#d1fae5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  hostAvatarText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#065f46',
+  hostAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 14,
   },
   hostInfo: {
     flex: 1,
@@ -331,17 +373,11 @@ const styles = StyleSheet.create({
   hostHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   hostName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-  },
-  verifiedCheck: {
-    fontSize: 14,
-    color: '#10b981',
-    fontWeight: '800',
   },
   hostSub: {
     fontSize: 12,
@@ -350,9 +386,9 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
     color: '#4b5563',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -361,29 +397,43 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.4,
+  },
+  sectionPrice: {
     fontSize: 18,
     fontWeight: '800',
     color: '#111827',
   },
-  sectionPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+  monthRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
   },
   monthLabel: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
     color: '#6b7280',
-    marginBottom: 12,
+  },
+  monthArrows: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  arrowButton: {
+    padding: 4,
   },
   calendarStrip: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   dayCard: {
-    width: 52,
-    height: 64,
+    width: 54,
+    height: 68,
     backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -398,7 +448,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dateLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
     color: '#111827',
   },
@@ -412,46 +462,60 @@ const styles = StyleSheet.create({
   },
   timeBox: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   timeBoxLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6b7280',
     marginBottom: 4,
   },
+  timeValueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   timeBoxValue: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#111827',
   },
   cancellationNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   cancellationText: {
     fontSize: 12,
     color: '#059669',
     fontWeight: '600',
   },
-  bottomBar: {
+  bottomBarContainer: {
     position: 'absolute',
-    bottom: 58,
+    bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 4,
+    paddingTop: 12,
+    paddingBottom: 24,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  priceSummaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
+    marginBottom: 12,
   },
   priceSummary: {
     flex: 1,
@@ -459,30 +523,27 @@ const styles = StyleSheet.create({
   calculationFormula: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
+    color: '#374151',
   },
   serviceFeeNote: {
     fontSize: 11,
     color: '#9ca3af',
+    marginTop: 2,
   },
   totalBlock: {
     alignItems: 'flex-end',
   },
   totalPrice: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: '#111827',
   },
-  buttonWrapper: {
-    position: 'absolute',
-    bottom: 8,
-    left: 16,
-    right: 16,
-  },
   bookButton: {
     backgroundColor: '#1b5e3a',
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   buttonDisabled: {
@@ -490,7 +551,7 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
   },
 });

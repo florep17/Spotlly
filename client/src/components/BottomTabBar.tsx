@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export type TabName = 'search' | 'reservations' | 'add' | 'account';
 
@@ -16,7 +17,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
         onPress={() => onTabChange('search')}
         activeOpacity={0.7}
       >
-        <Text style={[styles.tabIcon, activeTab === 'search' && styles.activeIcon]}>🗺️</Text>
+        <Ionicons
+          name={activeTab === 'search' ? 'map' : 'map-outline'}
+          size={22}
+          color={activeTab === 'search' ? '#1b5e3a' : '#6b7280'}
+        />
         <Text style={[styles.tabLabel, activeTab === 'search' && styles.activeLabel]}>Szukaj</Text>
       </TouchableOpacity>
 
@@ -25,7 +30,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
         onPress={() => onTabChange('reservations')}
         activeOpacity={0.7}
       >
-        <Text style={[styles.tabIcon, activeTab === 'reservations' && styles.activeIcon]}>📅</Text>
+        <Ionicons
+          name={activeTab === 'reservations' ? 'calendar' : 'calendar-outline'}
+          size={22}
+          color={activeTab === 'reservations' ? '#1b5e3a' : '#6b7280'}
+        />
         <Text style={[styles.tabLabel, activeTab === 'reservations' && styles.activeLabel]}>
           Rezerwacje
         </Text>
@@ -36,7 +45,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
         onPress={() => onTabChange('add')}
         activeOpacity={0.7}
       >
-        <Text style={[styles.tabIcon, activeTab === 'add' && styles.activeIcon]}>⊕</Text>
+        <Ionicons
+          name={activeTab === 'add' ? 'add-circle' : 'add-circle-outline'}
+          size={24}
+          color={activeTab === 'add' ? '#1b5e3a' : '#6b7280'}
+        />
         <Text style={[styles.tabLabel, activeTab === 'add' && styles.activeLabel]}>Dodaj</Text>
       </TouchableOpacity>
 
@@ -45,7 +58,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
         onPress={() => onTabChange('account')}
         activeOpacity={0.7}
       >
-        <Text style={[styles.tabIcon, activeTab === 'account' && styles.activeIcon]}>👤</Text>
+        <Ionicons
+          name={activeTab === 'account' ? 'person' : 'person-outline'}
+          size={22}
+          color={activeTab === 'account' ? '#1b5e3a' : '#6b7280'}
+        />
         <Text style={[styles.tabLabel, activeTab === 'account' && styles.activeLabel]}>Konto</Text>
       </TouchableOpacity>
     </View>
@@ -54,34 +71,28 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 70,
+    height: 72,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#f3f4f6',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 10,
+    paddingBottom: 12,
+    paddingTop: 6,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabIcon: {
-    fontSize: 20,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#6b7280',
-  },
-  activeIcon: {
-    transform: [{ scale: 1.1 }],
+    marginTop: 3,
   },
   activeLabel: {
     color: '#1b5e3a',
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

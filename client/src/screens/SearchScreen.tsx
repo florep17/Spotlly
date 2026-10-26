@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ParkingSpot } from '../types/spot';
 import { MOCK_SPOTS } from '../services/api/spotsService';
 
@@ -15,9 +16,11 @@ interface SearchScreenProps {
   onSelectSpot: (spot: ParkingSpot) => void;
 }
 
+const garageThumb = require('../../assets/garage_thumb.png');
+const mapKazimierz = require('../../assets/map_kazimierz.png');
+
 export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot>(MOCK_SPOTS[0]);
-  const [activeFilter, setActiveFilter] = useState<'map' | 'list'>('map');
 
   return (
     <View style={styles.container}>
@@ -39,135 +42,128 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Feather name="search" size={18} color="#4b5563" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Kazimierz, Kraków"
-            placeholderTextColor="#1f2937"
+            placeholderTextColor="#111827"
             defaultValue="Kazimierz, Kraków"
           />
-          <TouchableOpacity style={styles.filterIconButton}>
-            <Text style={styles.filterIconText}>⚙️</Text>
+          <TouchableOpacity style={styles.filterIconButton} activeOpacity={0.7}>
+            <Feather name="sliders" size={18} color="#374151" />
           </TouchableOpacity>
         </View>
 
         {/* Filter Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsRow}>
-          <TouchableOpacity style={styles.chip}>
-            <Text style={styles.chipText}>📅 12 paź ▾</Text>
+          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
+            <Feather name="calendar" size={13} color="#374151" style={styles.chipIcon} />
+            <Text style={styles.chipText}>12 paź</Text>
+            <Feather name="chevron-down" size={14} color="#6b7280" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.chip}>
-            <Text style={styles.chipText}>⏰ 10:00–13:00 ▾</Text>
+
+          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
+            <Feather name="clock" size={13} color="#374151" style={styles.chipIcon} />
+            <Text style={styles.chipText}>10:00–13:00</Text>
+            <Feather name="chevron-down" size={14} color="#6b7280" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.chip}>
-            <Text style={styles.chipText}>Poniżej 10 zł ▾</Text>
+
+          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
+            <Text style={styles.chipText}>Poniżej 10 zł</Text>
+            <Feather name="chevron-down" size={14} color="#6b7280" />
           </TouchableOpacity>
         </ScrollView>
       </View>
 
-      {/* Map Simulation Container */}
+      {/* Map View Container */}
       <View style={styles.mapContainer}>
-        {/* Map Grid & Road Simulation */}
-        <View style={styles.mapGrid}>
-          <View style={[styles.buildingBlock, { top: 20, left: 10, width: 90, height: 70 }]} />
-          <View style={[styles.buildingBlock, { top: 20, left: 120, width: 90, height: 70 }]} />
-          <View style={[styles.buildingBlock, { top: 20, left: 230, width: 90, height: 70 }]} />
+        {/* Authentic Kazimierz Map Background */}
+        <Image source={mapKazimierz} style={styles.mapBackground} resizeMode="cover" />
 
-          <View style={[styles.buildingBlock, { top: 120, left: 10, width: 90, height: 90 }]} />
-          <View style={[styles.buildingBlock, { top: 120, left: 120, width: 90, height: 90 }]} />
-          <View style={[styles.parkBlock, { top: 120, left: 230, width: 90, height: 90 }]}>
-            <Text style={styles.parkLabel}>Skwer Juda</Text>
-          </View>
+        {/* Interactive Floating Price Pins */}
+        <TouchableOpacity
+          style={[styles.pricePin, styles.activePin, { top: 180, left: 165 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.activePinText}>5 zł</Text>
+        </TouchableOpacity>
 
-          <View style={[styles.buildingBlock, { top: 230, left: 10, width: 90, height: 80 }]} />
-          <View style={[styles.buildingBlock, { top: 230, left: 120, width: 90, height: 80 }]} />
-          <View style={[styles.buildingBlock, { top: 230, left: 230, width: 90, height: 80 }]} />
+        <TouchableOpacity
+          style={[styles.pricePin, { top: 78, left: 245 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.pricePinText}>8 zł</Text>
+        </TouchableOpacity>
 
-          {/* Street Labels */}
-          <Text style={[styles.streetLabel, { top: 98, left: 130 }]}>Miodowa</Text>
-          <Text style={[styles.streetLabel, { top: 215, left: 10 }]}>Józefa</Text>
-          <Text
-            style={[styles.streetLabel, { top: 260, left: 190, transform: [{ rotate: '-45deg' }] }]}
-          >
-            Starowiślna
-          </Text>
+        <TouchableOpacity
+          style={[styles.pricePin, { top: 135, left: 45 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.pricePinText}>4 zł</Text>
+        </TouchableOpacity>
 
-          {/* Interactive Price Pins on Map */}
-          <TouchableOpacity
-            style={[styles.pricePin, styles.activePin, { top: 180, left: 170 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
-          >
-            <Text style={styles.activePinText}>5 zł</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pricePin, { top: 295, left: 75 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.pricePinText}>3 zł</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.pricePin, { top: 75, left: 250 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
-          >
-            <Text style={styles.pricePinText}>8 zł</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pricePin, { top: 290, left: 285 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.pricePinText}>6 zł</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.pricePin, { top: 160, left: 45 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
-          >
-            <Text style={styles.pricePinText}>4 zł</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pricePin, { top: 375, left: 228 }]}
+          onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.pricePinText}>7 zł</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.pricePin, { top: 270, left: 70 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
-          >
-            <Text style={styles.pricePinText}>3 zł</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.pricePin, { top: 280, left: 280 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
-          >
-            <Text style={styles.pricePinText}>6 zł</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.pricePin, { top: 320, left: 230 }]}
-            onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
-          >
-            <Text style={styles.pricePinText}>7 zł</Text>
-          </TouchableOpacity>
-
-          {/* Current User Location Dot */}
-          <View style={[styles.userDot, { top: 220, left: 135 }]} />
-
-          {/* Top Overlays */}
-          <View style={styles.nearbyPill}>
-            <Text style={styles.nearbyPillText}>12 miejsc w pobliżu</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.toggleListPill}
-            onPress={() => setActiveFilter(activeFilter === 'map' ? 'list' : 'map')}
-          >
-            <Text style={styles.toggleListText}>📋 Lista</Text>
-          </TouchableOpacity>
-
-          <View style={styles.recenterButton}>
-            <Text style={styles.recenterIcon}>🎯</Text>
-          </View>
-
-          <Text style={styles.osmAttribution}>© OpenStreetMap</Text>
+        {/* Top Badges */}
+        <View style={styles.nearbyPill}>
+          <Text style={styles.nearbyPillText}>12 miejsc w pobliżu</Text>
         </View>
+
+        <TouchableOpacity style={styles.toggleListPill} activeOpacity={0.8}>
+          <Feather name="list" size={14} color="#111827" style={{ marginRight: 6 }} />
+          <Text style={styles.toggleListText}>Lista</Text>
+        </TouchableOpacity>
+
+        {/* Location Crosshair Button */}
+        <TouchableOpacity style={styles.recenterButton} activeOpacity={0.85}>
+          <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#1e4620" />
+        </TouchableOpacity>
+
+        <Text style={styles.osmAttribution}>© OpenStreetMap</Text>
 
         {/* Bottom Preview Spot Card */}
         {selectedSpot && (
           <View style={styles.previewCard}>
             <View style={styles.previewCardContent}>
-              <Image source={{ uri: selectedSpot.imageUrl }} style={styles.spotThumb} />
+              <Image source={garageThumb} style={styles.spotThumb} />
               <View style={styles.spotInfo}>
                 <View style={styles.ratingRow}>
-                  <Text style={styles.starText}>⭐ {selectedSpot.rating}</Text>
-                  <Text style={styles.reviewCount}>({selectedSpot.reviewCount})</Text>
+                  <Ionicons
+                    name="star-outline"
+                    size={14}
+                    color="#1b5e3a"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.starText}>
+                    4,9 <Text style={styles.reviewCount}>(32)</Text>
+                  </Text>
                   <Text style={styles.walkingDot}> · </Text>
-                  <Text style={styles.walkingText}>{selectedSpot.walkingMinutes} min pieszo</Text>
+                  <Text style={styles.walkingText}>3 min pieszo</Text>
                 </View>
 
                 <Text style={styles.spotTitle}>{selectedSpot.title}</Text>
@@ -175,9 +171,25 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
                   {selectedSpot.address} · {selectedSpot.isCovered ? 'Zadaszone' : 'Odkryte'}
                 </Text>
 
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceMain}>{selectedSpot.hourlyPrice.toFixed(0)} zł</Text>
-                  <Text style={styles.priceUnit}> / godz.</Text>
+                <View style={styles.priceActionRow}>
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceMain}>{selectedSpot.hourlyPrice.toFixed(0)} zł</Text>
+                    <Text style={styles.priceUnit}> / godz.</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.detailsButton}
+                    onPress={() => onSelectSpot(selectedSpot)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.detailsButtonText}>Zobacz miejsce</Text>
+                    <Feather
+                      name="arrow-right"
+                      size={15}
+                      color="#1b5e3a"
+                      style={{ marginLeft: 4 }}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -189,13 +201,6 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
                   Dostępne dziś, {selectedSpot.availableFrom}–{selectedSpot.availableTo}
                 </Text>
               </View>
-
-              <TouchableOpacity
-                style={styles.detailsButton}
-                onPress={() => onSelectSpot(selectedSpot)}
-              >
-                <Text style={styles.detailsButtonText}>Zobacz miejsce ➔</Text>
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -210,47 +215,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   header: {
-    paddingTop: 50,
+    paddingTop: 54,
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 14,
     backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   logoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   brandIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     backgroundColor: '#1b5e3a',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 10,
   },
   brandIconText: {
     color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
   },
   brandTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#111827',
+    letterSpacing: -0.5,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e5f3ea',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#e6f3eb',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -260,128 +264,110 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   tagline: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 14,
+    marginBottom: 16,
+    letterSpacing: -0.6,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 24,
+    borderRadius: 28,
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
   },
   filterIconButton: {
     padding: 4,
   },
-  filterIconText: {
-    fontSize: 18,
-  },
   filterChipsRow: {
     flexDirection: 'row',
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 18,
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     marginRight: 8,
+  },
+  chipIcon: {
+    marginRight: 6,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
+    marginRight: 4,
   },
   mapContainer: {
     flex: 1,
-    backgroundColor: '#eef2f6',
+    backgroundColor: '#e5eae8',
     position: 'relative',
+    overflow: 'hidden',
   },
-  mapGrid: {
-    flex: 1,
-    position: 'relative',
-  },
-  buildingBlock: {
+  mapBackground: {
+    width: '100%',
+    height: '100%',
     position: 'absolute',
-    backgroundColor: '#e2e8f0',
-    borderRadius: 8,
-  },
-  parkBlock: {
-    position: 'absolute',
-    backgroundColor: '#d1fae5',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  parkLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#065f46',
-  },
-  streetLabel: {
-    position: 'absolute',
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#94a3b8',
+    top: 0,
+    left: 0,
   },
   pricePin: {
     position: 'absolute',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    elevation: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOpacity: 0.16,
+    shadowRadius: 5,
   },
   pricePinText: {
     fontWeight: '700',
-    fontSize: 13,
-    color: '#111827',
+    fontSize: 14,
+    color: '#1b5e3a',
   },
   activePin: {
     backgroundColor: '#1b5e3a',
     transform: [{ scale: 1.1 }],
+    elevation: 6,
+    shadowOpacity: 0.25,
   },
   activePinText: {
-    fontWeight: '700',
-    fontSize: 14,
+    fontWeight: '800',
+    fontSize: 15,
     color: '#ffffff',
-  },
-  userDot: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#1b5e3a',
-    borderWidth: 3,
-    borderColor: '#ffffff',
   },
   nearbyPill: {
     position: 'absolute',
     top: 14,
     left: 14,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   nearbyPillText: {
     fontSize: 12,
@@ -393,63 +379,71 @@ const styles = StyleSheet.create({
     top: 14,
     right: 14,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   toggleListText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#111827',
   },
   recenterButton: {
     position: 'absolute',
-    bottom: 170,
+    bottom: 168,
     right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-  },
-  recenterIcon: {
-    fontSize: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
   },
   osmAttribution: {
     position: 'absolute',
-    bottom: 160,
+    bottom: 162,
     left: 14,
-    fontSize: 10,
-    color: '#94a3b8',
+    fontSize: 9,
+    color: '#6b7280',
   },
   previewCard: {
     position: 'absolute',
     bottom: 10,
-    left: 14,
-    right: 14,
+    left: 12,
+    right: 12,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 14,
-    elevation: 6,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
   },
   previewCardContent: {
     flexDirection: 'row',
   },
   spotThumb: {
-    width: 90,
-    height: 90,
-    borderRadius: 12,
+    width: 96,
+    height: 96,
+    borderRadius: 14,
     marginRight: 14,
-    backgroundColor: '#e5e7eb',
   },
   spotInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   ratingRow: {
     flexDirection: 'row',
@@ -457,16 +451,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   starText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#111827',
   },
   reviewCount: {
-    fontSize: 12,
     color: '#6b7280',
+    fontWeight: '400',
   },
   walkingDot: {
-    fontSize: 12,
     color: '#9ca3af',
   },
   walkingText: {
@@ -474,15 +467,21 @@ const styles = StyleSheet.create({
     color: '#4b5563',
   },
   spotTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: '#111827',
     marginBottom: 2,
+    letterSpacing: -0.3,
   },
   spotAddress: {
     fontSize: 12,
     color: '#6b7280',
     marginBottom: 6,
+  },
+  priceActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   priceRow: {
     flexDirection: 'row',
@@ -494,17 +493,24 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   priceUnit: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#4b5563',
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  detailsButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1b5e3a',
   },
   previewCardFooter: {
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   availabilityStatus: {
     flexDirection: 'row',
@@ -515,19 +521,11 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: '#10b981',
-    marginRight: 6,
+    marginRight: 7,
   },
   availabilityText: {
     fontSize: 12,
     color: '#374151',
     fontWeight: '500',
-  },
-  detailsButton: {
-    paddingVertical: 4,
-  },
-  detailsButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1b5e3a',
   },
 });

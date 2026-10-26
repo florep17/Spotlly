@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { SpotType } from '../types/spot';
 import { spotsService } from '../services/api/spotsService';
 
@@ -16,11 +17,14 @@ interface AddSpotScreenProps {
   onSuccess: () => void;
 }
 
+const garageHero = require('../../assets/garage_hero.png');
+const garageInterior = require('../../assets/garage_interior.png');
+
 export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
   const [street, setStreet] = useState('Dajwór 14');
   const [city, setCity] = useState('Kraków');
   const [postalCode, setPostalCode] = useState('31-052');
-  const [price, setPrice] = useState('5.00');
+  const [price, setPrice] = useState('5,00');
   const [selectedType, setSelectedType] = useState<SpotType>('GARAGE');
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -32,7 +36,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
         address: street,
         city,
         postalCode,
-        hourlyPrice: parseFloat(price) || 5.0,
+        hourlyPrice: parseFloat(price.replace(',', '.')) || 5.0,
         spotType: selectedType,
       });
 
@@ -57,7 +61,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Dodaj swoje miejsce</Text>
-          <TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}>
             <Text style={styles.saveDraft}>Zapisz szkic</Text>
           </TouchableOpacity>
         </View>
@@ -70,37 +74,47 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
         <Text style={styles.sectionHeading}>Gdzie jest Twoje miejsce?</Text>
 
         <Text style={styles.inputLabel}>Ulica i numer</Text>
-        <TextInput
-          style={styles.textInput}
-          value={street}
-          onChangeText={setStreet}
-          placeholder="np. Dajwór 14"
-        />
+        <View style={styles.inputContainer}>
+          <Feather name="map-pin" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+          <TextInput
+            style={styles.textInput}
+            value={street}
+            onChangeText={setStreet}
+            placeholder="np. Dajwór 14"
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
 
         <View style={styles.row}>
           <View style={[styles.flex1, { marginRight: 8 }]}>
             <Text style={styles.inputLabel}>Miasto</Text>
-            <TextInput
-              style={styles.textInput}
-              value={city}
-              onChangeText={setCity}
-              placeholder="Kraków"
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={city}
+                onChangeText={setCity}
+                placeholder="Kraków"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
           </View>
 
           <View style={[styles.flex1, { marginLeft: 8 }]}>
             <Text style={styles.inputLabel}>Kod pocztowy</Text>
-            <TextInput
-              style={styles.textInput}
-              value={postalCode}
-              onChangeText={setPostalCode}
-              placeholder="31-052"
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={postalCode}
+                onChangeText={setPostalCode}
+                placeholder="31-052"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
           </View>
         </View>
 
         <View style={styles.privacyNote}>
-          <Text style={styles.privacyIcon}>🔒</Text>
+          <Feather name="lock" size={13} color="#6b7280" style={{ marginRight: 6 }} />
           <Text style={styles.privacyText}>Dokładny adres udostępnimy dopiero po rezerwacji.</Text>
         </View>
 
@@ -117,13 +131,13 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
             value={price}
             onChangeText={setPrice}
             keyboardType="numeric"
-            placeholder="5.00"
+            placeholder="5,00"
           />
           <Text style={styles.priceUnit}>/ godz.</Text>
         </View>
 
         <View style={styles.priceHintBox}>
-          <Text style={styles.hintIcon}>💡</Text>
+          <Ionicons name="sparkles" size={18} color="#1b5e3a" style={{ marginRight: 8 }} />
           <Text style={styles.hintText}>Miejsca w okolicy kosztują zwykle 4–8 zł za godz.</Text>
         </View>
 
@@ -135,32 +149,25 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
         <Text style={styles.photosSub}>Dodaj wyraźne zdjęcia wjazdu i miejsca parkingowego.</Text>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
+          {/* Photo 1: Garage Front */}
           <View style={styles.photoThumbWrapper}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=400&q=80',
-              }}
-              style={styles.photoThumb}
-            />
+            <Image source={garageHero} style={styles.photoThumb} resizeMode="cover" />
             <View style={styles.mainBadge}>
               <Text style={styles.mainBadgeText}>Główne</Text>
             </View>
           </View>
 
+          {/* Photo 2: Garage Interior */}
           <View style={styles.photoThumbWrapper}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=400&q=80',
-              }}
-              style={styles.photoThumb}
-            />
-            <TouchableOpacity style={styles.removePhotoBadge}>
-              <Text style={styles.removePhotoText}>✕</Text>
+            <Image source={garageInterior} style={styles.photoThumb} resizeMode="cover" />
+            <TouchableOpacity style={styles.removePhotoBadge} activeOpacity={0.8}>
+              <Feather name="x" size={13} color="#111827" />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.addPhotoButton}>
-            <Text style={styles.addPhotoIcon}>📷</Text>
+          {/* Photo 3: Add button */}
+          <TouchableOpacity style={styles.addPhotoButton} activeOpacity={0.7}>
+            <Feather name="camera" size={24} color="#1b5e3a" style={{ marginBottom: 6 }} />
             <Text style={styles.addPhotoLabel}>Dodaj zdjęcie</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -172,36 +179,48 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
           <TouchableOpacity
             style={[styles.typeButton, selectedType === 'GARAGE' && styles.typeButtonSelected]}
             onPress={() => setSelectedType('GARAGE')}
+            activeOpacity={0.8}
           >
+            {selectedType === 'GARAGE' && (
+              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
+            )}
             <Text
               style={[styles.typeButtonText, selectedType === 'GARAGE' && styles.typeTextSelected]}
             >
-              {selectedType === 'GARAGE' ? '✓ ' : ''}Garaż
+              Garaż
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.typeButton, selectedType === 'DRIVEWAY' && styles.typeButtonSelected]}
             onPress={() => setSelectedType('DRIVEWAY')}
+            activeOpacity={0.8}
           >
+            {selectedType === 'DRIVEWAY' && (
+              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
+            )}
             <Text
               style={[
                 styles.typeButtonText,
                 selectedType === 'DRIVEWAY' && styles.typeTextSelected,
               ]}
             >
-              {selectedType === 'DRIVEWAY' ? '✓ ' : ''}Podjazd
+              Podjazd
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.typeButton, selectedType === 'OUTDOOR' && styles.typeButtonSelected]}
             onPress={() => setSelectedType('OUTDOOR')}
+            activeOpacity={0.8}
           >
+            {selectedType === 'OUTDOOR' && (
+              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
+            )}
             <Text
               style={[styles.typeButtonText, selectedType === 'OUTDOOR' && styles.typeTextSelected]}
             >
-              {selectedType === 'OUTDOOR' ? '✓ ' : ''}Na zewnątrz
+              Na zewnątrz
             </Text>
           </TouchableOpacity>
         </View>
@@ -211,10 +230,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
           style={[styles.publishButton, isPublishing && styles.buttonDisabled]}
           onPress={handlePublish}
           disabled={isPublishing}
+          activeOpacity={0.85}
         >
           <Text style={styles.publishButtonText}>
-            {isPublishing ? 'Publikowanie...' : 'Opublikuj miejsce ➔'}
+            {isPublishing ? 'Publikowanie...' : 'Opublikuj miejsce'}
           </Text>
+          <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
 
         <Text style={styles.disclaimerText}>
@@ -232,7 +253,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   scrollContainer: {
-    paddingTop: 50,
+    paddingTop: 52,
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
@@ -243,9 +264,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: '#111827',
+    letterSpacing: -0.5,
   },
   saveDraft: {
     fontSize: 14,
@@ -263,7 +285,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111827',
     marginBottom: 10,
-    marginTop: 10,
+    marginTop: 12,
   },
   inputLabel: {
     fontSize: 13,
@@ -271,15 +293,22 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 6,
   },
-  textInput: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#111827',
     marginBottom: 12,
+    backgroundColor: '#ffffff',
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
   },
   row: {
     flexDirection: 'row',
@@ -291,10 +320,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-  },
-  privacyIcon: {
-    fontSize: 13,
-    marginRight: 6,
   },
   privacyText: {
     fontSize: 12,
@@ -320,36 +345,36 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 10,
+    backgroundColor: '#ffffff',
   },
   priceInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#111827',
   },
   priceUnit: {
     fontSize: 14,
     color: '#6b7280',
+    fontWeight: '500',
   },
   priceHintBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-    padding: 12,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     marginBottom: 16,
   },
-  hintIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
   hintText: {
     fontSize: 12,
-    color: '#065f46',
+    color: '#1b5e3a',
     fontWeight: '500',
+    flex: 1,
   },
   photosHeaderRow: {
     flexDirection: 'row',
@@ -368,54 +393,54 @@ const styles = StyleSheet.create({
   },
   photosRow: {
     flexDirection: 'row',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   photoThumbWrapper: {
-    width: 100,
-    height: 90,
-    borderRadius: 12,
+    width: 110,
+    height: 96,
+    borderRadius: 14,
     marginRight: 12,
     position: 'relative',
+    overflow: 'hidden',
   },
   photoThumb: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
   },
   mainBadge: {
     position: 'absolute',
     bottom: 6,
     left: 6,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   mainBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#111827',
   },
   removePhotoBadge: {
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  removePhotoText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
   addPhotoButton: {
-    width: 100,
-    height: 90,
-    borderRadius: 12,
+    width: 110,
+    height: 96,
+    borderRadius: 14,
     backgroundColor: '#f9fafb',
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -423,14 +448,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addPhotoIcon: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
   addPhotoLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#059669',
+    color: '#1b5e3a',
   },
   photoFormatNote: {
     fontSize: 11,
@@ -439,21 +460,23 @@ const styles = StyleSheet.create({
   },
   typeOptionsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginBottom: 20,
   },
   typeButton: {
     flex: 1,
+    flexDirection: 'row',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ffffff',
   },
   typeButtonSelected: {
     borderColor: '#1b5e3a',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#f0fdf4',
   },
   typeButtonText: {
     fontSize: 13,
@@ -465,8 +488,10 @@ const styles = StyleSheet.create({
   },
   publishButton: {
     backgroundColor: '#1b5e3a',
-    borderRadius: 14,
-    paddingVertical: 15,
+    borderRadius: 16,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 12,
