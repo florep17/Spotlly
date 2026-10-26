@@ -28,3 +28,30 @@ add_executable(spotly_search_engine
 target_link_libraries(spotly_search_engine
     PRIVATE Crow::Crow
 )
+
+
+# Unit testing with GoogleTest
+option(SPOTLY_BUILD_TESTS "Build unit tests" ON)
+
+if(SPOTLY_BUILD_TESTS)
+    enable_testing()
+
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.16.0
+    )
+
+    FetchContent_MakeAvailable(googletest)
+
+    add_executable(spotly_tests
+        tests/SearchEngineTest.cpp
+    )
+
+    target_link_libraries(spotly_tests
+        PRIVATE GTest::gtest_main
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(spotly_tests)
+endif()
