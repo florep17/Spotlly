@@ -7,8 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  TouchableWithoutFeedback,
-  Keyboard,
   Animated,
   Pressable,
   ScrollView,
@@ -156,290 +154,279 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardContainer}
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardContainer}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            bounces={false}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          {/* Top Branding Section */}
+          <Animated.View
+            style={[
+              styles.topSection,
+              {
+                opacity: entranceAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
           >
-            {/* Top Branding Section */}
-            <Animated.View
+            {/* Clean Spotly Brand */}
+            <View style={styles.brandRow}>
+              <Pressable onPress={handleLogoTap}>
+                <Animated.View
+                  style={[styles.brandIconWrapper, { transform: [{ scale: logoScale }] }]}
+                >
+                  <View style={styles.brandIcon}>
+                    <Text style={styles.brandIconText}>S</Text>
+                  </View>
+                </Animated.View>
+              </Pressable>
+              <Text style={styles.appName}>Spotly</Text>
+            </View>
+
+            {/* Seamless Animated Parking Simulation Area */}
+            <View style={styles.parkingSceneContainer}>
+              <ParkingAnimationScene />
+            </View>
+          </Animated.View>
+
+          {/* Bottom Form Card (Anchored smoothly with no gap) */}
+          <Animated.View
+            style={[
+              styles.formCard,
+              {
+                opacity: entranceAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {/* Mode Toggle: Logowanie vs Rejestracja */}
+            <View style={styles.tabSelector}>
+              <Pressable
+                style={[styles.tabItem, authMode === 'login' && styles.tabItemActive]}
+                onPress={() => {
+                  setAuthMode('login');
+                  setErrorMessage(null);
+                }}
+              >
+                <Text
+                  style={[styles.tabItemText, authMode === 'login' && styles.tabItemTextActive]}
+                >
+                  Logowanie
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.tabItem, authMode === 'register' && styles.tabItemActive]}
+                onPress={() => {
+                  setAuthMode('register');
+                  setErrorMessage(null);
+                }}
+              >
+                <Text
+                  style={[styles.tabItemText, authMode === 'register' && styles.tabItemTextActive]}
+                >
+                  Rejestracja
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.cardHeader}>
+              <Text style={styles.welcomeText}>
+                {authMode === 'register' ? 'Dołącz do Spotly' : 'Witaj w Spotly'}
+              </Text>
+              <Text style={styles.instructionText}>
+                {authMode === 'register'
+                  ? 'Wprowadź dane, aby utworzyć konto w systemie'
+                  : 'Zaloguj się, aby znaleźć lub udostępnić miejsce'}
+              </Text>
+            </View>
+
+            {errorMessage && (
+              <View style={styles.errorBox}>
+                <Feather name="alert-circle" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+
+            {/* Nickname Input (Required on register, optional on login) */}
+            <View
               style={[
-                styles.topSection,
-                {
-                  opacity: entranceAnim,
-                  transform: [{ translateY: slideAnim }],
-                },
+                styles.inputContainer,
+                focusedField === 'nickname' && styles.inputContainerFocused,
               ]}
             >
-              {/* Clean Spotly Brand */}
-              <View style={styles.brandRow}>
-                <Pressable onPress={handleLogoTap}>
-                  <Animated.View
-                    style={[styles.brandIconWrapper, { transform: [{ scale: logoScale }] }]}
-                  >
-                    <View style={styles.brandIcon}>
-                      <Text style={styles.brandIconText}>S</Text>
-                    </View>
-                  </Animated.View>
-                </Pressable>
-                <Text style={styles.appName}>Spotly</Text>
-              </View>
+              <Feather
+                name="user"
+                size={18}
+                color={focusedField === 'nickname' ? '#1b5e3a' : '#9ca3af'}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder={
+                  authMode === 'register'
+                    ? 'Nick / Nazwa użytkownika *'
+                    : 'Nick / Nazwa użytkownika'
+                }
+                placeholderTextColor="#9ca3af"
+                value={nickname}
+                onFocus={() => setFocusedField('nickname')}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(val) => {
+                  setNickname(val);
+                  setErrorMessage(null);
+                }}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
 
-              {/* Seamless Animated Parking Simulation Area */}
-              <View style={styles.parkingSceneContainer}>
-                <ParkingAnimationScene />
-              </View>
-            </Animated.View>
-
-            {/* Bottom Form Card (Anchored smoothly with no gap) */}
-            <Animated.View
+            {/* Email Input with Glow on Focus */}
+            <View
               style={[
-                styles.formCard,
-                {
-                  opacity: entranceAnim,
-                  transform: [{ translateY: slideAnim }],
-                },
+                styles.inputContainer,
+                focusedField === 'email' && styles.inputContainerFocused,
               ]}
             >
-              {/* Mode Toggle: Logowanie vs Rejestracja */}
-              <View style={styles.tabSelector}>
-                <Pressable
-                  style={[styles.tabItem, authMode === 'login' && styles.tabItemActive]}
-                  onPress={() => {
-                    setAuthMode('login');
-                    setErrorMessage(null);
-                  }}
-                >
-                  <Text
-                    style={[styles.tabItemText, authMode === 'login' && styles.tabItemTextActive]}
-                  >
-                    Logowanie
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.tabItem, authMode === 'register' && styles.tabItemActive]}
-                  onPress={() => {
-                    setAuthMode('register');
-                    setErrorMessage(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.tabItemText,
-                      authMode === 'register' && styles.tabItemTextActive,
-                    ]}
-                  >
-                    Rejestracja
-                  </Text>
-                </Pressable>
-              </View>
+              <Feather
+                name="mail"
+                size={18}
+                color={focusedField === 'email' ? '#1b5e3a' : '#9ca3af'}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Adres e-mail *"
+                placeholderTextColor="#9ca3af"
+                value={email}
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  setErrorMessage(null);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
-              <View style={styles.cardHeader}>
-                <Text style={styles.welcomeText}>
-                  {authMode === 'register' ? 'Dołącz do Spotly' : 'Witaj w Spotly'}
-                </Text>
-                <Text style={styles.instructionText}>
-                  {authMode === 'register'
-                    ? 'Wprowadź dane, aby utworzyć konto w systemie'
-                    : 'Zaloguj się, aby znaleźć lub udostępnić miejsce'}
-                </Text>
-              </View>
-
-              {errorMessage && (
-                <View style={styles.errorBox}>
-                  <Feather
-                    name="alert-circle"
-                    size={14}
-                    color="#ef4444"
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={styles.errorText}>{errorMessage}</Text>
-                </View>
-              )}
-
-              {/* Nickname Input (Required on register, optional on login) */}
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusedField === 'nickname' && styles.inputContainerFocused,
-                ]}
+            {/* Password Input with Glow on Focus */}
+            <View
+              style={[
+                styles.inputContainer,
+                focusedField === 'password' && styles.inputContainerFocused,
+              ]}
+            >
+              <Feather
+                name="lock"
+                size={18}
+                color={focusedField === 'password' ? '#1b5e3a' : '#9ca3af'}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder={authMode === 'register' ? 'Hasło (min. 6 znaków) *' : 'Hasło *'}
+                placeholderTextColor="#9ca3af"
+                value={password}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeButton}
+                hitSlop={8}
               >
                 <Feather
-                  name="user"
-                  size={18}
-                  color={focusedField === 'nickname' ? '#1b5e3a' : '#9ca3af'}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder={
-                    authMode === 'register'
-                      ? 'Nick / Nazwa użytkownika *'
-                      : 'Nick / Nazwa użytkownika'
-                  }
-                  placeholderTextColor="#9ca3af"
-                  value={nickname}
-                  onFocus={() => setFocusedField('nickname')}
-                  onBlur={() => setFocusedField(null)}
-                  onChangeText={(val) => {
-                    setNickname(val);
-                    setErrorMessage(null);
-                  }}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-
-              {/* Email Input with Glow on Focus */}
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusedField === 'email' && styles.inputContainerFocused,
-                ]}
-              >
-                <Feather
-                  name="mail"
-                  size={18}
-                  color={focusedField === 'email' ? '#1b5e3a' : '#9ca3af'}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Adres e-mail *"
-                  placeholderTextColor="#9ca3af"
-                  value={email}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  onChangeText={(val) => {
-                    setEmail(val);
-                    setErrorMessage(null);
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              {/* Password Input with Glow on Focus */}
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusedField === 'password' && styles.inputContainerFocused,
-                ]}
-              >
-                <Feather
-                  name="lock"
+                  name={showPassword ? 'eye-off' : 'eye'}
                   size={18}
                   color={focusedField === 'password' ? '#1b5e3a' : '#9ca3af'}
-                  style={styles.inputIcon}
                 />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder={authMode === 'register' ? 'Hasło (min. 6 znaków) *' : 'Hasło *'}
-                  placeholderTextColor="#9ca3af"
-                  value={password}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
+              </Pressable>
+            </View>
+
+            {/* Primary Action Button with Spring Physical Press Animation */}
+            <Pressable
+              onPressIn={() => handlePressInButton(buttonScale)}
+              onPressOut={() => handlePressOutButton(buttonScale)}
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              <Animated.View
+                style={[
+                  styles.primaryButton,
+                  isLoading && styles.buttonDisabled,
+                  { transform: [{ scale: buttonScale }] },
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <>
+                    <Feather
+                      name={authMode === 'register' ? 'user-plus' : 'log-in'}
+                      size={18}
+                      color="#ffffff"
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.primaryButtonText}>
+                      {authMode === 'register'
+                        ? 'Zarejestruj się w Spotly'
+                        : 'Zaloguj się przez Email'}
+                    </Text>
+                  </>
+                )}
+              </Animated.View>
+            </Pressable>
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>LUB</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Secondary Google Button with Spring Press Animation */}
+            <Pressable
+              onPressIn={() => handlePressInButton(googleScale)}
+              onPressOut={() => handlePressOutButton(googleScale)}
+              onPress={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              <Animated.View style={[styles.googleButton, { transform: [{ scale: googleScale }] }]}>
+                <Ionicons
+                  name="logo-google"
+                  size={18}
+                  color="#db4437"
+                  style={{ marginRight: 10 }}
                 />
-                <Pressable
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                  hitSlop={8}
-                >
-                  <Feather
-                    name={showPassword ? 'eye-off' : 'eye'}
-                    size={18}
-                    color={focusedField === 'password' ? '#1b5e3a' : '#9ca3af'}
-                  />
-                </Pressable>
-              </View>
+                <Text style={styles.googleButtonText}>Kontynuuj z Google</Text>
+              </Animated.View>
+            </Pressable>
 
-              {/* Primary Action Button with Spring Physical Press Animation */}
-              <Pressable
-                onPressIn={() => handlePressInButton(buttonScale)}
-                onPressOut={() => handlePressOutButton(buttonScale)}
-                onPress={handleSubmit}
-                disabled={isLoading}
-              >
-                <Animated.View
-                  style={[
-                    styles.primaryButton,
-                    isLoading && styles.buttonDisabled,
-                    { transform: [{ scale: buttonScale }] },
-                  ]}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <>
-                      <Feather
-                        name={authMode === 'register' ? 'user-plus' : 'log-in'}
-                        size={18}
-                        color="#ffffff"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.primaryButtonText}>
-                        {authMode === 'register'
-                          ? 'Zarejestruj się w Spotly'
-                          : 'Zaloguj się przez Email'}
-                      </Text>
-                    </>
-                  )}
-                </Animated.View>
-              </Pressable>
-
-              {/* Divider */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>LUB</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Secondary Google Button with Spring Press Animation */}
-              <Pressable
-                onPressIn={() => handlePressInButton(googleScale)}
-                onPressOut={() => handlePressOutButton(googleScale)}
-                onPress={handleGoogleLogin}
-                disabled={isLoading}
-              >
-                <Animated.View
-                  style={[styles.googleButton, { transform: [{ scale: googleScale }] }]}
-                >
-                  <Ionicons
-                    name="logo-google"
-                    size={18}
-                    color="#db4437"
-                    style={{ marginRight: 10 }}
-                  />
-                  <Text style={styles.googleButtonText}>Kontynuuj z Google</Text>
-                </Animated.View>
-              </Pressable>
-
-              {/* Quick bypass demo link */}
-              <Pressable
-                style={styles.demoLink}
-                onPress={() =>
-                  onLoginSuccess('demo.kierowca@spotly.io', nickname.trim() || 'Gość Testowy')
-                }
-                hitSlop={6}
-              >
-                <Text style={styles.demoLinkText}>Wejdź jako gość testowy ➔</Text>
-              </Pressable>
-            </Animated.View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    </TouchableWithoutFeedback>
+            {/* Quick bypass demo link */}
+            <Pressable
+              style={styles.demoLink}
+              onPress={() =>
+                onLoginSuccess('demo.kierowca@spotly.io', nickname.trim() || 'Gość Testowy')
+              }
+              hitSlop={6}
+            >
+              <Text style={styles.demoLinkText}>Wejdź jako gość testowy ➔</Text>
+            </Pressable>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 

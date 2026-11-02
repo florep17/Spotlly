@@ -66,7 +66,7 @@ const CarModel: React.FC<CarProps> = ({
   );
 };
 
-export const ParkingAnimationScene: React.FC = () => {
+const ParkingAnimationSceneComponent: React.FC = () => {
   // Car 2 (Starts in Bay 2, then departs)
   const [car2X] = useState(() => new Animated.Value(BAY2_X));
   const [car2Y] = useState(() => new Animated.Value(BAY_Y));
@@ -456,6 +456,8 @@ export const ParkingAnimationScene: React.FC = () => {
     </View>
   );
 };
+
+export const ParkingAnimationScene = React.memo(ParkingAnimationSceneComponent);
 
 const styles = StyleSheet.create({
   sceneWrapper: {
