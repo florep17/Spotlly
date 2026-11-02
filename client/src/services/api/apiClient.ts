@@ -3,7 +3,7 @@
  * Komunikacja z modułem backendowym (Spring Boot 3 / api)
  */
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8081/api/v1';
 
 export class ApiError extends Error {
   constructor(
@@ -27,7 +27,14 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new ApiError(response.status, errorBody || `HTTP ${response.status}`);
+    let message = `HTTP ${response.status}`;
+    try {
+      const parsed = JSON.parse(errorBody);
+      message = parsed.message || parsed.error || message;
+    } catch {
+      if (errorBody) message = errorBody;
+    }
+    throw new ApiError(response.status, message);
   }
 
   return response.json();

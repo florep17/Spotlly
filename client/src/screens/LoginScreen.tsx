@@ -22,6 +22,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,9 +89,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     ]).start();
   };
 
-  const handleEmailLogin = async () => {
+  const handleSubmit = async () => {
     setErrorMessage(null);
-    if (!email.trim()) {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedNick = nickname.trim();
+
+    if (!trimmedEmail) {
       setErrorMessage('Wprowadź adres e-mail.');
       return;
     }
@@ -99,16 +103,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
+    if (authMode === 'register') {
+      if (!trimmedNick || trimmedNick.length < 2) {
+        setErrorMessage('Podaj nick (minimum 2 znaki).');
+        return;
+      }
+      if (password.length < 6) {
+        setErrorMessage('Hasło musi mieć co najmniej 6 znaków.');
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
-      const response = await authService.loginWithEmail(
-        email,
-        password,
-        nickname.trim() || undefined
-      );
-      onLoginSuccess(response.user.email, response.user.fullName || nickname.trim() || undefined);
-    } catch {
-      setErrorMessage('Błąd logowania. Sprawdź wprowadzone dane.');
+      const response =
+        authMode === 'register'
+          ? await authService.register(trimmedEmail, password, trimmedNick)
+          : await authService.loginWithEmail(trimmedEmail, password, trimmedNick || undefined);
+
+      const resolvedNick =
+        response.user.nickname ||
+        response.user.fullName ||
+        trimmedNick ||
+        trimmedEmail.split('@')[0];
+
+      onLoginSuccess(response.user.email, resolvedNick);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMessage(err.message || 'Błąd uwierzytelniania.');
+      } else {
+        setErrorMessage('Błąd uwierzytelniania. Spróbuj ponownie.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +144,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     try {
       const response = await authService.loginWithGoogle('mock_google_oauth_token');
-      onLoginSuccess(response.user.email, nickname.trim() || undefined);
+      onLoginSuccess(
+        response.user.email,
+        response.user.nickname || response.user.fullName || nickname.trim() || undefined
+      );
     } catch {
       setErrorMessage('Logowanie z Google jest obecnie niedostępne.');
     } finally {
@@ -150,7 +178,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 },
               ]}
             >
-              {/* Clean Spotly Brand (no clutter badges) */}
+              {/* Clean Spotly Brand */}
               <View style={styles.brandRow}>
                 <Pressable onPress={handleLogoTap}>
                   <Animated.View
@@ -180,10 +208,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 },
               ]}
             >
+              {/* Mode Toggle: Logowanie vs Rejestracja */}
+              <View style={styles.tabSelector}>
+                <Pressable
+                  style={[styles.tabItem, authMode === 'login' && styles.tabItemActive]}
+                  onPress={() => {
+                    setAuthMode('login');
+                    setErrorMessage(null);
+                  }}
+                >
+                  <Text
+                    style={[styles.tabItemText, authMode === 'login' && styles.tabItemTextActive]}
+                  >
+                    Logowanie
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.tabItem, authMode === 'register' && styles.tabItemActive]}
+                  onPress={() => {
+                    setAuthMode('register');
+                    setErrorMessage(null);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.tabItemText,
+                      authMode === 'register' && styles.tabItemTextActive,
+                    ]}
+                  >
+                    Rejestracja
+                  </Text>
+                </Pressable>
+              </View>
+
               <View style={styles.cardHeader}>
-                <Text style={styles.welcomeText}>Witaj w Spotly</Text>
+                <Text style={styles.welcomeText}>
+                  {authMode === 'register' ? 'Dołącz do Spotly' : 'Witaj w Spotly'}
+                </Text>
                 <Text style={styles.instructionText}>
-                  Zaloguj się, aby znaleźć lub udostępnić miejsce
+                  {authMode === 'register'
+                    ? 'Wprowadź dane, aby utworzyć konto w systemie'
+                    : 'Zaloguj się, aby znaleźć lub udostępnić miejsce'}
                 </Text>
               </View>
 
@@ -199,7 +264,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </View>
               )}
 
-              {/* Nickname / Imię Input */}
+              {/* Nickname Input (Required on register, optional on login) */}
               <View
                 style={[
                   styles.inputContainer,
@@ -214,7 +279,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Nick / Nazwa użytkownika"
+                  placeholder={
+                    authMode === 'register'
+                      ? 'Nick / Nazwa użytkownika *'
+                      : 'Nick / Nazwa użytkownika'
+                  }
                   placeholderTextColor="#9ca3af"
                   value={nickname}
                   onFocus={() => setFocusedField('nickname')}
@@ -243,7 +312,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Adres e-mail"
+                  placeholder="Adres e-mail *"
                   placeholderTextColor="#9ca3af"
                   value={email}
                   onFocus={() => setFocusedField('email')}
@@ -273,7 +342,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Hasło"
+                  placeholder={authMode === 'register' ? 'Hasło (min. 6 znaków) *' : 'Hasło *'}
                   placeholderTextColor="#9ca3af"
                   value={password}
                   onFocus={() => setFocusedField('password')}
@@ -299,7 +368,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Pressable
                 onPressIn={() => handlePressInButton(buttonScale)}
                 onPressOut={() => handlePressOutButton(buttonScale)}
-                onPress={handleEmailLogin}
+                onPress={handleSubmit}
                 disabled={isLoading}
               >
                 <Animated.View
@@ -313,8 +382,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <ActivityIndicator color="#ffffff" size="small" />
                   ) : (
                     <>
-                      <Feather name="log-in" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                      <Text style={styles.primaryButtonText}>Zaloguj się przez Email</Text>
+                      <Feather
+                        name={authMode === 'register' ? 'user-plus' : 'log-in'}
+                        size={18}
+                        color="#ffffff"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.primaryButtonText}>
+                        {authMode === 'register'
+                          ? 'Zarejestruj się w Spotly'
+                          : 'Zaloguj się przez Email'}
+                      </Text>
                     </>
                   )}
                 </Animated.View>
@@ -429,7 +507,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 22,
-    paddingTop: 24,
+    paddingTop: 18,
     paddingBottom: 48,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -8 },
@@ -438,11 +516,41 @@ const styles = StyleSheet.create({
     elevation: 14,
     marginTop: -16, // Seamless overlap onto the bottom of the road
   },
+  tabSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 14,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  tabItemActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  tabItemTextActive: {
+    color: '#1b5e3a',
+    fontWeight: '800',
+  },
   cardHeader: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   welcomeText: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '800',
     color: '#111827',
     marginBottom: 3,

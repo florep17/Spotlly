@@ -1,5 +1,5 @@
 import { User } from '../../types/user';
-import { request } from './apiClient';
+import { request, ApiError } from './apiClient';
 
 export interface LoginResponse {
   access_token: string;
@@ -10,7 +10,7 @@ export interface LoginResponse {
 
 /**
  * Serwis autoryzacji Spotly.
- * Przygotowany do podpięcia endpointów backendu Maxa (Spring Boot /api).
+ * Komunikacja z modułem backendowym (Spring Boot 3 / api).
  */
 export const authService = {
   /**
@@ -26,7 +26,10 @@ export const authService = {
         method: 'POST',
         body: JSON.stringify({ email, password, nickname }),
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       // Fallback lokalny na czas pracy offline lub braku połączenia z backendem
       const mockUser: User = {
         id: 'u-450e12-b1',
@@ -43,6 +46,48 @@ export const authService = {
         user: mockUser,
       };
     }
+  },
+
+  /**
+   * Rejestracja nowego konta
+   */
+  async register(email: string, password: string, nickname: string): Promise<LoginResponse> {
+    try {
+      return await request<LoginResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, nickname }),
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      const mockUser: User = {
+        id: `u-${Date.now().toString(36)}`,
+        email: email || 'driver@spotly.io',
+        fullName: nickname || (email ? email.split('@')[0] : 'Kierowca'),
+        role: 'BOTH',
+        createdAt: new Date().toISOString(),
+      };
+
+      return {
+        access_token: 'spotly_jwt_mock_token_dev_2026',
+        token_type: 'Bearer',
+        expires_in_seconds: 86400,
+        user: mockUser,
+      };
+    }
+  },
+
+  /**
+   * Pobranie profilu aktualnie zalogowanego użytkownika
+   */
+  async getCurrentUser(token: string): Promise<User> {
+    return await request<User>('/auth/me', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
   },
 
   /**
