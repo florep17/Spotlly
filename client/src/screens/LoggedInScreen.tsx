@@ -4,11 +4,17 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 
 interface LoggedInScreenProps {
   email: string;
+  nickname?: string;
   onEnterApp: () => void;
   onLogout: () => void;
 }
 
-export const LoggedInScreen: React.FC<LoggedInScreenProps> = ({ email, onEnterApp, onLogout }) => {
+export const LoggedInScreen: React.FC<LoggedInScreenProps> = ({
+  email,
+  nickname,
+  onEnterApp,
+  onLogout,
+}) => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -19,15 +25,27 @@ export const LoggedInScreen: React.FC<LoggedInScreenProps> = ({ email, onEnterAp
           </View>
         </View>
 
-        <Text style={styles.title}>Zalogowano pomyślnie!</Text>
+        <Text style={styles.title}>
+          {nickname ? `Cześć, ${nickname}!` : 'Zalogowano pomyślnie!'}
+        </Text>
         <Text style={styles.subtitle}>
           Twoja sesja została pomyślnie uwierzytelniona w systemie Spotly.
         </Text>
 
         {/* User Session Info Card */}
         <View style={styles.infoCard}>
+          {nickname && (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Nick:</Text>
+                <Text style={styles.infoValue}>{nickname}</Text>
+              </View>
+              <View style={styles.divider} />
+            </>
+          )}
+
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Użytkownik:</Text>
+            <Text style={styles.infoLabel}>E-mail:</Text>
             <Text style={styles.infoValue}>{email || 'kierowca@spotly.io'}</Text>
           </View>
 

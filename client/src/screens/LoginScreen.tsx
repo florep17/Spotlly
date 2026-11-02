@@ -4,7 +4,6 @@ import {
   Text,
   View,
   TextInput,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -12,27 +11,28 @@ import {
   Keyboard,
   Animated,
   Pressable,
+  ScrollView,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { authService } from '../services/api/authService';
+import { ParkingAnimationScene } from '../components/ParkingAnimationScene';
 
 interface LoginScreenProps {
-  onLoginSuccess: (email: string) => void;
+  onLoginSuccess: (email: string, nickname?: string) => void;
 }
 
-const parkingBackground = require('../../assets/parking_bg.jpg');
-
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
+  const [focusedField, setFocusedField] = useState<'nickname' | 'email' | 'password' | null>(null);
 
   // Animation values initialized via state factory
   const [entranceAnim] = useState(() => new Animated.Value(0));
-  const [slideAnim] = useState(() => new Animated.Value(30));
+  const [slideAnim] = useState(() => new Animated.Value(20));
   const [buttonScale] = useState(() => new Animated.Value(1));
   const [googleScale] = useState(() => new Animated.Value(1));
   const [logoScale] = useState(() => new Animated.Value(1));
@@ -42,68 +42,86 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     Animated.parallel([
       Animated.timing(entranceAnim, {
         toValue: 1,
-        duration: 550,
+        duration: 450,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
-        tension: 40,
+        tension: 45,
         useNativeDriver: true,
       }),
     ]).start();
   }, [entranceAnim, slideAnim]);
 
-  const handlePressInButton = (scaleVar: Animated.Value) => {
-    Animated.spring(scaleVar, {
-      toValue: 0.95,
-      speed: 50,
-      bounciness: 0,
+  // Press animation helpers
+  const handlePressInButton = (scaleVal: Animated.Value) => {
+    Animated.spring(scaleVal, {
+      toValue: 0.96,
       useNativeDriver: true,
     }).start();
   };
 
-  const handlePressOutButton = (scaleVar: Animated.Value) => {
-    Animated.spring(scaleVar, {
+  const handlePressOutButton = (scaleVal: Animated.Value) => {
+    Animated.spring(scaleVal, {
       toValue: 1,
-      friction: 4,
-      tension: 60,
+      friction: 5,
+      tension: 100,
       useNativeDriver: true,
     }).start();
   };
 
   const handleLogoTap = () => {
     Animated.sequence([
-      Animated.timing(logoScale, { toValue: 1.15, duration: 120, useNativeDriver: true }),
-      Animated.spring(logoScale, { toValue: 1, friction: 3, tension: 50, useNativeDriver: true }),
+      Animated.spring(logoScale, {
+        toValue: 1.15,
+        friction: 4,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: true,
+      }),
     ]).start();
   };
 
   const handleEmailLogin = async () => {
-    Keyboard.dismiss();
     setErrorMessage(null);
+    if (!email.trim()) {
+      setErrorMessage('Wprowadź adres e-mail.');
+      return;
+    }
+    if (!password.trim()) {
+      setErrorMessage('Wprowadź hasło dostępu.');
+      return;
+    }
 
-    const userEmail = email.trim() || 'kierowca@spotly.io';
     setIsLoading(true);
-
     try {
-      await authService.loginWithEmail(userEmail, password);
-      onLoginSuccess(userEmail);
+      const response = await authService.loginWithEmail(
+        email,
+        password,
+        nickname.trim() || undefined
+      );
+      onLoginSuccess(response.user.email, response.user.fullName || nickname.trim() || undefined);
     } catch {
-      setErrorMessage('Nie udało się zalogować. Spróbuj ponownie.');
+      setErrorMessage('Błąd logowania. Sprawdź wprowadzone dane.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    Keyboard.dismiss();
+    setErrorMessage(null);
     setIsLoading(true);
     try {
-      await authService.loginWithGoogle('mock_google_id_token');
-      onLoginSuccess('google.user@spotly.io');
+      const response = await authService.loginWithGoogle('mock_google_oauth_token');
+      onLoginSuccess(response.user.email, nickname.trim() || undefined);
     } catch {
-      onLoginSuccess('google.user@spotly.io');
+      setErrorMessage('Logowanie z Google jest obecnie niedostępne.');
     } finally {
       setIsLoading(false);
     }
@@ -112,17 +130,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
-        <ImageBackground
-          source={parkingBackground}
-          style={styles.backgroundImage}
-          resizeMode="cover"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardContainer}
         >
-          {/* Subtle gradient overlay to enhance readability */}
-          <View style={styles.overlay} />
-
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardContainer}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Top Branding Section */}
             <Animated.View
@@ -134,29 +150,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 },
               ]}
             >
-              <Pressable onPress={handleLogoTap}>
-                <Animated.View
-                  style={[styles.brandIconWrapper, { transform: [{ scale: logoScale }] }]}
-                >
-                  <View style={styles.brandIcon}>
-                    <Text style={styles.brandIconText}>S</Text>
-                  </View>
-                </Animated.View>
-              </Pressable>
+              {/* Clean Spotly Brand (no clutter badges) */}
+              <View style={styles.brandRow}>
+                <Pressable onPress={handleLogoTap}>
+                  <Animated.View
+                    style={[styles.brandIconWrapper, { transform: [{ scale: logoScale }] }]}
+                  >
+                    <View style={styles.brandIcon}>
+                      <Text style={styles.brandIconText}>S</Text>
+                    </View>
+                  </Animated.View>
+                </Pressable>
+                <Text style={styles.appName}>Spotly</Text>
+              </View>
 
-              <Text style={styles.appName}>Spotly</Text>
-              <View style={styles.taglineBadge}>
-                <Ionicons
-                  name="shield-checkmark"
-                  size={14}
-                  color="#10b981"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.tagline}>P2P Parking Sharing</Text>
+              {/* Seamless Animated Parking Simulation Area */}
+              <View style={styles.parkingSceneContainer}>
+                <ParkingAnimationScene />
               </View>
             </Animated.View>
 
-            {/* Bottom Form Card with Elevation & Glass styling */}
+            {/* Bottom Form Card (Anchored smoothly with no gap) */}
             <Animated.View
               style={[
                 styles.formCard,
@@ -166,17 +180,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 },
               ]}
             >
-              <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.welcomeText}>Witaj w Spotly</Text>
-                  <Text style={styles.instructionText}>
-                    Zaloguj się, aby znaleźć lub udostępnić miejsce
-                  </Text>
-                </View>
-                <View style={styles.spotIndicator}>
-                  <Text style={styles.spotIndicatorDot}>●</Text>
-                  <Text style={styles.spotIndicatorText}>Live</Text>
-                </View>
+              <View style={styles.cardHeader}>
+                <Text style={styles.welcomeText}>Witaj w Spotly</Text>
+                <Text style={styles.instructionText}>
+                  Zaloguj się, aby znaleźć lub udostępnić miejsce
+                </Text>
               </View>
 
               {errorMessage && (
@@ -190,6 +198,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   <Text style={styles.errorText}>{errorMessage}</Text>
                 </View>
               )}
+
+              {/* Nickname / Imię Input */}
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedField === 'nickname' && styles.inputContainerFocused,
+                ]}
+              >
+                <Feather
+                  name="user"
+                  size={18}
+                  color={focusedField === 'nickname' ? '#1b5e3a' : '#9ca3af'}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Nick / Nazwa użytkownika"
+                  placeholderTextColor="#9ca3af"
+                  value={nickname}
+                  onFocus={() => setFocusedField('nickname')}
+                  onBlur={() => setFocusedField(null)}
+                  onChangeText={(val) => {
+                    setNickname(val);
+                    setErrorMessage(null);
+                  }}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
 
               {/* Email Input with Glow on Focus */}
               <View
@@ -313,14 +350,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               {/* Quick bypass demo link */}
               <Pressable
                 style={styles.demoLink}
-                onPress={() => onLoginSuccess('demo.kierowca@spotly.io')}
+                onPress={() =>
+                  onLoginSuccess('demo.kierowca@spotly.io', nickname.trim() || 'Gość Testowy')
+                }
                 hitSlop={6}
               >
                 <Text style={styles.demoLinkText}>Wejdź jako gość testowy ➔</Text>
               </Pressable>
             </Animated.View>
-          </KeyboardAvoidingView>
-        </ImageBackground>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -329,123 +368,90 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0f1d',
-  },
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(10, 15, 29, 0.48)',
+    backgroundColor: '#070b14',
   },
   keyboardContainer: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 54,
-    paddingBottom: 26,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 46,
   },
   topSection: {
+    width: '100%',
     alignItems: 'center',
-    marginTop: 6,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    paddingHorizontal: 16,
   },
   brandIconWrapper: {
     shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 10,
-    marginBottom: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
+    marginRight: 10,
   },
   brandIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: '#1b5e3a',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   brandIconText: {
     color: '#ffffff',
-    fontSize: 34,
+    fontSize: 21,
     fontWeight: '900',
   },
   appName: {
-    fontSize: 34,
+    fontSize: 26,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
   },
-  taglineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  tagline: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '700',
-    letterSpacing: 0.3,
+  parkingSceneContainer: {
+    width: '100%',
+    height: 290,
+    overflow: 'hidden',
   },
   formCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    borderRadius: 28,
+    flex: 1,
+    minHeight: 510,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    elevation: 12,
+    paddingTop: 24,
+    paddingBottom: 48,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 14,
+    marginTop: -16, // Seamless overlap onto the bottom of the road
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  cardHeader: {
     marginBottom: 16,
   },
   welcomeText: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 3,
     letterSpacing: -0.4,
   },
   instructionText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#6b7280',
-    maxWidth: 240,
-  },
-  spotIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  spotIndicatorDot: {
-    color: '#10b981',
-    fontSize: 10,
-    marginRight: 4,
-  },
-  spotIndicatorText: {
-    color: '#065f46',
-    fontSize: 11,
-    fontWeight: '800',
+    lineHeight: 17,
   },
   errorBox: {
     flexDirection: 'row',
@@ -453,15 +459,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
     borderWidth: 1,
     borderColor: '#fecaca',
-    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    marginBottom: 12,
   },
   errorText: {
-    fontSize: 12,
     color: '#b91c1c',
+    fontSize: 12,
     fontWeight: '600',
+    flex: 1,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -469,10 +476,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    height: 52,
-    marginBottom: 12,
+    height: 48,
+    marginBottom: 11,
   },
   inputContainerFocused: {
     borderColor: '#10b981',
@@ -488,40 +495,40 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: '#111827',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   eyeButton: {
     padding: 6,
   },
   primaryButton: {
     backgroundColor: '#1b5e3a',
-    borderRadius: 16,
-    height: 52,
+    borderRadius: 14,
+    height: 48,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
     shadowColor: '#1b5e3a',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 4,
+    marginTop: 3,
   },
   buttonDisabled: {
-    backgroundColor: '#9ca3af',
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: 0.2,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 14,
+    marginVertical: 12,
   },
   dividerLine: {
     flex: 1,
@@ -530,39 +537,40 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     marginHorizontal: 12,
-    fontSize: 11,
-    fontWeight: '800',
     color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 0.8,
   },
   googleButton: {
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    borderRadius: 16,
-    height: 50,
+    borderRadius: 14,
+    height: 46,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
   },
   googleButtonText: {
-    color: '#1f2937',
-    fontSize: 15,
+    color: '#374151',
+    fontSize: 14,
     fontWeight: '600',
   },
   demoLink: {
-    alignItems: 'center',
-    marginTop: 14,
+    alignSelf: 'center',
+    marginTop: 12,
     paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   demoLinkText: {
-    fontSize: 13,
-    color: '#1b5e3a',
+    color: '#059669',
+    fontSize: 12.5,
     fontWeight: '700',
   },
 });

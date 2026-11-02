@@ -14,21 +14,24 @@ export interface LoginResponse {
  */
 export const authService = {
   /**
-   * Logowanie za pomocą adresu email i hasła
+   * Logowanie za pomocą adresu email, hasła oraz opcjonalnego nicku
    */
-  async loginWithEmail(email: string, _password?: string): Promise<LoginResponse> {
+  async loginWithEmail(
+    email: string,
+    password?: string,
+    nickname?: string
+  ): Promise<LoginResponse> {
     try {
-      // Gdy Max wdroży endpoint logowania, wystarczy odkomentować poniższe:
-      // return await request<LoginResponse>('/auth/login', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ email, password: _password }),
-      // });
-
-      // Symulacja pomyślnego logowania (fallback do mocka):
+      return await request<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, nickname }),
+      });
+    } catch {
+      // Fallback lokalny na czas pracy offline lub braku połączenia z backendem
       const mockUser: User = {
         id: 'u-450e12-b1',
         email: email || 'driver@spotly.io',
-        fullName: email ? email.split('@')[0] : 'Jan Kowalski',
+        fullName: nickname || (email ? email.split('@')[0] : 'Kierowca'),
         role: 'BOTH',
         createdAt: new Date().toISOString(),
       };
@@ -39,16 +42,13 @@ export const authService = {
         expires_in_seconds: 86400,
         user: mockUser,
       };
-    } catch (error) {
-      console.warn('Login request failed, using local session', error);
-      throw error;
     }
   },
 
   /**
    * Logowanie przez Google (OAuth2 ID Token)
    */
-  async loginWithGoogle(idToken: string): Promise<LoginResponse> {
+  async loginWithGoogle(idToken: string = 'mock_google_oauth_token'): Promise<LoginResponse> {
     try {
       return await request<LoginResponse>('/auth/oauth/google', {
         method: 'POST',

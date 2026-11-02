@@ -16,11 +16,13 @@ type AuthState = 'unauthenticated' | 'logged_in_splash' | 'main_app';
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('unauthenticated');
   const [userEmail, setUserEmail] = useState<string>('kierowca@spotly.io');
+  const [userNick, setUserNick] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabName>('search');
   const [selectedSpotForBooking, setSelectedSpotForBooking] = useState<ParkingSpot | null>(null);
 
-  const handleLoginSuccess = (email: string) => {
+  const handleLoginSuccess = (email: string, nickname?: string) => {
     setUserEmail(email);
+    setUserNick(nickname || '');
     setAuthState('logged_in_splash');
   };
 
@@ -71,7 +73,12 @@ export default function App() {
     return (
       <View style={styles.container}>
         <StatusBar style="dark" />
-        <LoggedInScreen email={userEmail} onEnterApp={handleEnterApp} onLogout={handleLogout} />
+        <LoggedInScreen
+          email={userEmail}
+          nickname={userNick}
+          onEnterApp={handleEnterApp}
+          onLogout={handleLogout}
+        />
       </View>
     );
   }
