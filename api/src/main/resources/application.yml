@@ -28,6 +28,7 @@ spotly:
   search-engine:
     base-url: ${SEARCH_ENGINE_URL:http://localhost:8080}
   jwt:
+    secret: ${SPOTLY_JWT_SECRET:spotly-super-secret-jwt-signing-key-minimum-256-bits-length-for-hmac-sha256}
     expiration-seconds: 86400
 
 management:

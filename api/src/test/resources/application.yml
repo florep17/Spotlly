@@ -12,3 +12,8 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+
+spotly:
+  jwt:
+    secret: spotly-super-secret-jwt-signing-key-minimum-256-bits-length-for-hmac-sha256
+    expiration-seconds: 86400

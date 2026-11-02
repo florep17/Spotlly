@@ -23,6 +23,12 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(name = "nickname", length = 100)
+    private String nickname;
+
+    @Column(name = "password_hash")
+    private String password;
+
     @Column(name = "first_name", length = 100)
     private String firstName;
 
@@ -43,4 +49,12 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    public String getPasswordHash() {
+        return this.password;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.password = passwordHash;
+    }
 }
