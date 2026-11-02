@@ -1,15 +1,25 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
-export const ProfileScreen: React.FC = () => {
+interface ProfileScreenProps {
+  userEmail?: string;
+  onLogout?: () => void;
+}
+
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogout }) => {
+  const displayEmail = userEmail || 'janusz.lewandowski@spotly.io';
+  const displayName = userEmail ? userEmail.split('@')[0] : 'Janusz Lewandowski';
+  const initials = displayName.slice(0, 2).toUpperCase();
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>JL</Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.userName}>Janusz Lewandowski</Text>
-        <Text style={styles.userEmail}>janusz.lewandowski@spotly.io</Text>
+        <Text style={styles.userName}>{displayName}</Text>
+        <Text style={styles.userEmail}>{displayEmail}</Text>
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Kierowca & Gospodarz</Text>
         </View>
@@ -19,7 +29,7 @@ export const ProfileScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>Uwierzytelnianie i Bezpieczeństwo</Text>
 
         <View style={styles.menuItem}>
-          <Text style={styles.menuIcon}>🍎</Text>
+          <Ionicons name="logo-apple" size={20} color="#111827" style={styles.menuIcon} />
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Apple Sign-In</Text>
             <Text style={styles.menuSub}>Połączono z kontem Apple ID</Text>
@@ -28,7 +38,7 @@ export const ProfileScreen: React.FC = () => {
         </View>
 
         <View style={styles.menuItem}>
-          <Text style={styles.menuIcon}>🌐</Text>
+          <Ionicons name="logo-google" size={19} color="#db4437" style={styles.menuIcon} />
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Google Sign-In</Text>
             <Text style={styles.menuSub}>Połączone z adresem Gmail</Text>
@@ -40,23 +50,38 @@ export const ProfileScreen: React.FC = () => {
       <View style={styles.menuSection}>
         <Text style={styles.sectionTitle}>Ustawienia aplikacji</Text>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuIcon}>💳</Text>
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Feather name="credit-card" size={19} color="#4b5563" style={styles.menuIcon} />
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Metody płatności</Text>
             <Text style={styles.menuSub}>Karty testowe, BLIK</Text>
           </View>
-          <Text style={styles.arrow}>➔</Text>
+          <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuIcon}>🔔</Text>
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Feather name="bell" size={19} color="#4b5563" style={styles.menuIcon} />
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Powiadomienia i opóźnienia</Text>
             <Text style={styles.menuSub}>Alerty o końcu czasu parkowania</Text>
           </View>
-          <Text style={styles.arrow}>➔</Text>
+          <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
+
+        {onLogout && (
+          <TouchableOpacity
+            style={[styles.menuItem, styles.logoutItem]}
+            onPress={onLogout}
+            activeOpacity={0.7}
+          >
+            <Feather name="log-out" size={19} color="#ef4444" style={styles.menuIcon} />
+            <View style={styles.menuTextContainer}>
+              <Text style={[styles.menuTitle, styles.logoutText]}>Wyloguj się</Text>
+              <Text style={styles.menuSub}>Zakończ bieżącą sesję</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="#ef4444" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -134,9 +159,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+  logoutItem: {
+    marginTop: 8,
+    borderColor: '#fee2e2',
+    backgroundColor: '#fff5f5',
+  },
+  logoutText: {
+    color: '#ef4444',
+  },
   menuIcon: {
-    fontSize: 22,
     marginRight: 12,
+    width: 22,
+    textAlign: 'center',
   },
   menuTextContainer: {
     flex: 1,
@@ -155,9 +189,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#059669',
-  },
-  arrow: {
-    fontSize: 14,
-    color: '#9ca3af',
   },
 });
