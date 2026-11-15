@@ -1,7 +1,10 @@
 #include "crow.h"
+#include "SpotStore.hpp"
+#include <cmath>
 
 int main() {
     crow::SimpleApp app;
+    spotly::SpotStore spotStore;
 
     CROW_ROUTE(app, "/health")([] {
         crow::json::wvalue response;
@@ -12,7 +15,96 @@ int main() {
         return response;
     });
 
-    app.port(8081).multithreaded().run();
+    CROW_ROUTE(app, "/api/v1/engine/spots/sync")
+        .methods(crow::HTTPMethod::POST)([&spotStore](const crow::request& req) {
+            auto body = crow::json::load(req.body);
+
+            if (!body) {
+                return crow::response(400, "Invalid JSON");
+            }
+
+            if (!body.has("spot_id") || body["spot_id"].t() != crow::json::type::String) {
+                return crow::response(400, "Missing or invalid spot_id");
+            }
+
+            const std::string spotId = body["spot_id"].s();
+
+            if (!body.has("latitude") || !body.has("longitude") || !body.has("hourly_rate")) {
+                return crow::response(400, "Missing coordinates or hourly_rate");
+            }
+
+            if (body["latitude"].t() != crow::json::type::Number || body["longitude"].t() != crow::json::type::Number || 
+                body["hourly_rate"].t() != crow::json::type::Number) {
+                return crow::response(400, "Invalid coordinates or hourly_rate");
+           
+            if (!body.has("max_vehicle_size") ||
+                body["max_vehicle_size"].t() != crow::json::type::String) {
+                return crow::response(400, "Missing or invalid max_vehicle_size");
+            }
+
+            if (!body.has("has_ev_charging") ||
+                body["has_ev_charging"].t() != crow::json::type::True &&
+                body["has_ev_charging"].t() != crow::json::type::False) {
+                return crow::response(400, "Missing or invalid has_ev_charging");
+            }
+
+            if (!body.has("is_active") ||
+                body["is_active"].t() != crow::json::type::True &&
+                body["is_active"].t() != crow::json::type::False) {
+                return crow::response(400, "Missing or invalid is_active");
+            }
+            }
+            if (body.has("max_height_meters") &&
+                body["max_height_meters"].t() != crow::json::type::Null &&
+                body["max_height_meters"].t() != crow::json::type::Number) {
+                return crow::response(400, "Invalid max_height_meters");
+            }
+
+
+            const double latitude = body["latitude"].d();
+            const double longitude = body["longitude"].d();
+            const double hourlyRate = body["hourly_rate"].d();
+            if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0 ||
+                !std::isfinite(longitude) || longitude < -180.0 || longitude > 180.0 ||
+                !std::isfinite(hourlyRate) || hourlyRate < 0.0) {
+                return crow::response(400, "Invalid coordinates or hourly_rate values");
+            }
+
+            const std::string maxVehicleSize = body["max_vehicle_size"].s();
+            const bool hasEvCharging = body["has_ev_charging"].b();
+            const bool isActive = body["is_active"].b();
+
+            std::optional<double> maxHeightMeters = std::nullopt;
+
+            if (body.has("max_height_meters") &&
+                body["max_height_meters"].t() != crow::json::type::Null) {
+                maxHeightMeters = body["max_height_meters"].d();
+            }
+
+            spotly::Spot spot{
+                spotId,
+                latitude,
+                longitude,
+                hourlyRate,
+                maxVehicleSize,
+                maxHeightMeters,
+                hasEvCharging,
+                isActive
+            };
+
+            spotStore.upsert(spot);
+
+            crow::json::wvalue result;
+            result["spot_id"] = spotId;
+            result["status"] = "synced";
+
+            crow::response response(200);
+            response.set_header("Content-Type", "application/json");
+            response.body = result.dump();
+            return response;
+        });
+
+    app.port(8080).multithreaded().run();
 
     return 0;
 }
