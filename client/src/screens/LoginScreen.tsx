@@ -400,9 +400,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Quick bypass demo link */}
           <Pressable
             style={styles.demoLink}
-            onPress={() =>
-              onLoginSuccess('demo.kierowca@spotly.io', nickname.trim() || 'Gość Testowy')
-            }
+            onPress={async () => {
+              try {
+                await authService.loginWithEmail(
+                  'demo.kierowca@spotly.io',
+                  'SpotlyDemo123!',
+                  nickname.trim() || 'Gość Testowy'
+                );
+              } catch {}
+              onLoginSuccess('demo.kierowca@spotly.io', nickname.trim() || 'Gość Testowy');
+            }}
             hitSlop={6}
           >
             <Text style={styles.demoLinkText}>Wejdź jako gość testowy ➔</Text>

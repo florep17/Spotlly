@@ -1,12 +1,48 @@
-import { ParkingSpot, SpotSearchParams } from '../../types/spot';
+import { ParkingSpot, SpotSearchParams, BackendSpotRequest, BackendSpotResponse } from '../../types/spot';
 import { request } from './apiClient';
 
 /**
- * Serwis obsługujący punkty parkingowe i integrację z wyszukiwarką
+ * Serwis obsługujący punkty parkingowe i integrację z backendem Spring Boot
  */
 export const spotsService = {
   /**
-   * Pobieranie listy dostępnych miejsc z filtrowaniem
+   * Pobieranie listy moich miejsc parkingowych (Host Dashboard)
+   * Endpoint: GET /api/v1/spots
+   */
+  async getMySpots(): Promise<BackendSpotResponse[]> {
+    try {
+      return await request<BackendSpotResponse[]>('/spots', {
+        method: 'GET',
+      });
+    } catch (error) {
+      console.warn('Nie udało się pobrać miejsc z API, użycie pamięci podręcznej:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Dodawanie nowego miejsca parkingowego przypisanego do zalogowanego konta
+   * Endpoint: POST /api/v1/spots
+   */
+  async createSpot(spotData: BackendSpotRequest): Promise<BackendSpotResponse> {
+    return await request<BackendSpotResponse>('/spots', {
+      method: 'POST',
+      body: JSON.stringify(spotData),
+    });
+  },
+
+  /**
+   * Usuwanie miejsca parkingowego należącego do użytkownika
+   * Endpoint: DELETE /api/v1/spots/{id}
+   */
+  async deleteSpot(id: string): Promise<void> {
+    await request<void>(`/spots/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Pobieranie listy dostępnych miejsc z filtrowaniem (wyszukiwarka)
    */
   async searchSpots(params: SpotSearchParams): Promise<ParkingSpot[]> {
     const queryParams = new URLSearchParams();
@@ -34,45 +70,6 @@ export const spotsService = {
       const found = MOCK_SPOTS.find((s) => s.id === id);
       if (!found) throw new Error('Miejsce nie znalezione');
       return found;
-    }
-  },
-
-  /**
-   * Dodawanie nowego miejsca parkingowego (dla właściciela)
-   */
-  async createSpot(spotData: Partial<ParkingSpot>): Promise<ParkingSpot> {
-    try {
-      return await request<ParkingSpot>('/spots', {
-        method: 'POST',
-        body: JSON.stringify(spotData),
-      });
-    } catch {
-      // Symulacja pomyślnego zapisu w trybie prototypu
-      const newSpot: ParkingSpot = {
-        id: `spot-${Date.now()}`,
-        title: spotData.title || 'Nowe miejsce parkingowe',
-        description: spotData.description || 'Prywatne miejsce parkingowe',
-        address: spotData.address || 'ul. Dajwór 14',
-        city: spotData.city || 'Kraków',
-        postalCode: spotData.postalCode || '31-052',
-        latitude: 50.051,
-        longitude: 19.947,
-        hourlyPrice: spotData.hourlyPrice || 5.0,
-        spotType: spotData.spotType || 'GARAGE',
-        isCovered: true,
-        isSecure: true,
-        fitsSuv: true,
-        rating: 5.0,
-        reviewCount: 0,
-        walkingMinutes: 3,
-        hostName: 'Ty',
-        isHostVerified: true,
-        imageUrl:
-          'https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=800&q=80',
-        availableFrom: '08:00',
-        availableTo: '16:00',
-      };
-      return newSpot;
     }
   },
 };

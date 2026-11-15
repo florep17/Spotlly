@@ -11,14 +11,21 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { BottomTabBar, TabName } from './src/components/BottomTabBar';
 import { ParkingSpot } from './src/types/spot';
 
+import { authService } from './src/services/api/authService';
+
 type AuthState = 'unauthenticated' | 'logged_in_splash' | 'main_app';
 
 export default function App() {
-  const [authState, setAuthState] = useState<AuthState>('unauthenticated');
-  const [userEmail, setUserEmail] = useState<string>('kierowca@spotly.io');
-  const [userNick, setUserNick] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<TabName>('search');
+  const [authState, setAuthState] = useState<AuthState>('main_app');
+  const [userEmail, setUserEmail] = useState<string>('host.test@spotly.io');
+  const [userNick, setUserNick] = useState<string>('HostMax');
+  const [activeTab, setActiveTab] = useState<TabName>('add');
   const [selectedSpotForBooking, setSelectedSpotForBooking] = useState<ParkingSpot | null>(null);
+
+  React.useEffect(() => {
+    // Automatyczna inicjalizacja sesji z tokenem JWT dla gospodarza testowego
+    authService.loginWithEmail('host.test@spotly.io', 'Password123!', 'HostMax').catch(() => {});
+  }, []);
 
   const handleLoginSuccess = (email: string, nickname?: string) => {
     setUserEmail(email);

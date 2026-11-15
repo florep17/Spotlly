@@ -5,6 +5,16 @@
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8081/api/v1';
 
+let currentAuthToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  currentAuthToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return currentAuthToken;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -17,11 +27,17 @@ export class ApiError extends Error {
 
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const headers = {
+  const customHeaders = (options.headers || {}) as Record<string, string>;
+
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    ...options.headers,
+    ...customHeaders,
   };
+
+  if (currentAuthToken && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${currentAuthToken}`;
+  }
 
   const response = await fetch(url, { ...options, headers });
 

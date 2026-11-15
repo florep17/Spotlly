@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,243 +6,524 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Image,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
-import { SpotType } from '../types/spot';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { BackendSpotResponse, BackendSpotRequest } from '../types/spot';
 import { spotsService } from '../services/api/spotsService';
+import { getAuthToken } from '../services/api/apiClient';
+import { authService } from '../services/api/authService';
 
 interface AddSpotScreenProps {
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
-const garageHero = require('../../assets/garage_hero.png');
-const garageInterior = require('../../assets/garage_interior.png');
+type ScreenMode = 'my_spots' | 'add_form';
 
-export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
-  const [street, setStreet] = useState('Dajwór 14');
+export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
+  const [mode, setMode] = useState<ScreenMode>('my_spots');
+
+  // --- List of My Spots state ---
+  const [mySpots, setMySpots] = useState<BackendSpotResponse[]>([]);
+  const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
+
+  // --- Add Form state ---
+  const [title, setTitle] = useState('');
+  const [street, setStreet] = useState('Pawia 5');
   const [city, setCity] = useState('Kraków');
-  const [postalCode, setPostalCode] = useState('31-052');
-  const [price, setPrice] = useState('5,00');
-  const [selectedType, setSelectedType] = useState<SpotType>('GARAGE');
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [price, setPrice] = useState('8.50');
+  const [spotType, setSpotType] = useState<'GARAGE' | 'UNDERGROUND' | 'DRIVEWAY' | 'SURFACE'>('GARAGE');
+  const [vehicleSize, setVehicleSize] = useState<'COMPACT' | 'SEDAN' | 'SUV' | 'VAN'>('SUV');
+  const [accessType, setAccessType] = useState<'CODE_KEYPAD' | 'BARRIER_PHONE' | 'REMOTE' | 'OPEN'>('CODE_KEYPAD');
+  const [gatePin, setGatePin] = useState('4921');
+  const [hasEv, setHasEv] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handlePublish = async () => {
-    setIsPublishing(true);
+  // Load spots for the logged-in user
+  const fetchSpots = useCallback(async (showLoader = true) => {
+    if (showLoader) setIsLoadingSpots(true);
     try {
-      await spotsService.createSpot({
-        title: `Miejsce ${selectedType === 'GARAGE' ? 'Garażowe' : 'Parkingowe'} - ${street}`,
-        address: street,
-        city,
-        postalCode,
-        hourlyPrice: parseFloat(price.replace(',', '.')) || 5.0,
-        spotType: selectedType,
-      });
+      if (!getAuthToken()) {
+        await authService.loginWithEmail('host.test@spotly.io', 'Password123!', 'HostMax');
+      }
+      const data = await spotsService.getMySpots();
+      setMySpots(data || []);
+    } catch {
+      // In case of error, spots list stays empty or previous
+    } finally {
+      setIsLoadingSpots(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSpots(true);
+  }, [fetchSpots]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchSpots(false);
+  };
+
+  // Handle Delete Spot
+  const handleDeleteSpot = (spot: BackendSpotResponse) => {
+    Alert.alert(
+      'Usunięcie miejsca parkingowego',
+      `Czy na pewno chcesz usunąć miejsce "${spot.title}" z Twojego konta?`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Usuń',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingSpotId(spot.id);
+            try {
+              await spotsService.deleteSpot(spot.id);
+              Alert.alert('Usunięto', 'Miejsce parkingowe zostało usunięte z Twojego konta.');
+              // Refresh spots list
+              await fetchSpots(false);
+            } catch (error) {
+              const msg = error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania.';
+              Alert.alert('Błąd', msg);
+            } finally {
+              setDeletingSpotId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle Create Spot
+  const handleCreateSpot = async () => {
+    const trimmedTitle = title.trim() || `Miejsce ${spotType === 'GARAGE' ? 'Garażowe' : 'Parkingowe'} - ${street}`;
+    const parsedPrice = parseFloat(price.replace(',', '.')) || 8.0;
+
+    if (!street.trim()) {
+      Alert.alert('Błąd', 'Podaj ulicę i numer miejsca parkingowego.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: BackendSpotRequest = {
+        title: trimmedTitle,
+        address_street: street.trim(),
+        address_city: city.trim() || 'Kraków',
+        hourly_rate: parsedPrice,
+        spot_type: spotType,
+        max_vehicle_size: vehicleSize,
+        access_type: accessType,
+        gate_pin_code: gatePin.trim() || undefined,
+        has_ev_charging: hasEv,
+        latitude: 50.0614 + (Math.random() - 0.5) * 0.01,
+        longitude: 19.9383 + (Math.random() - 0.5) * 0.01,
+        is_active: true,
+      };
+
+      await spotsService.createSpot(payload);
 
       Alert.alert(
-        'Miejsce opublikowane! 🚀',
-        'Twoje miejsce parkingowe jest już widoczne dla kierowców w wyznaczonych godzinach.',
-        [{ text: 'Wróć do mapy', onPress: onSuccess }]
+        'Sukces! 🚀',
+        `Miejsce "${trimmedTitle}" zostało dodane i przypisane do Twojego konta.`,
+        [
+          {
+            text: 'Zobacz moje miejsca',
+            onPress: () => {
+              setTitle('');
+              setMode('my_spots');
+              fetchSpots(true);
+            },
+          },
+        ]
       );
-    } catch {
-      Alert.alert('Błąd', 'Nie udało się dodać miejsca. Spróbuj ponownie.');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Nie udało się dodać miejsca.';
+      Alert.alert('Błąd dodawania', msg);
     } finally {
-      setIsPublishing(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const getSpotTypeLabel = (type: string) => {
+    switch (type) {
+      case 'GARAGE':
+        return 'Garaż indywidualny';
+      case 'UNDERGROUND':
+        return 'Garaż podziemny';
+      case 'DRIVEWAY':
+        return 'Podjazd prywatny';
+      case 'SURFACE':
+      case 'OUTDOOR':
+        return 'Miejsce naziemne';
+      default:
+        return type;
     }
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContainer}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Dodaj swoje miejsce</Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.saveDraft}>Zapisz szkic</Text>
+      {/* Top Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Gospodarz Miejsc</Text>
+          <Text style={styles.headerSubtitle}>Zarządzaj miejscami przypisanymi do konta</Text>
+        </View>
+
+        {/* Quick Refresh Icon */}
+        {mode === 'my_spots' && (
+          <TouchableOpacity onPress={() => fetchSpots(true)} style={styles.refreshButton}>
+            <Feather name="rotate-cw" size={18} color="#1b5e3a" />
           </TouchableOpacity>
-        </View>
+        )}
+      </View>
 
-        <Text style={styles.subtitle}>
-          Zarabiaj na wolnym miejscu parkingowym. Na początek wystarczy kilka informacji.
-        </Text>
-
-        {/* Location Section */}
-        <Text style={styles.sectionHeading}>Gdzie jest Twoje miejsce?</Text>
-
-        <Text style={styles.inputLabel}>Ulica i numer</Text>
-        <View style={styles.inputContainer}>
-          <Feather name="map-pin" size={16} color="#6b7280" style={{ marginRight: 10 }} />
-          <TextInput
-            style={styles.textInput}
-            value={street}
-            onChangeText={setStreet}
-            placeholder="np. Dajwór 14"
-            placeholderTextColor="#9ca3af"
-          />
-        </View>
-
-        <View style={styles.row}>
-          <View style={[styles.flex1, { marginRight: 8 }]}>
-            <Text style={styles.inputLabel}>Miasto</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.textInput}
-                value={city}
-                onChangeText={setCity}
-                placeholder="Kraków"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-          </View>
-
-          <View style={[styles.flex1, { marginLeft: 8 }]}>
-            <Text style={styles.inputLabel}>Kod pocztowy</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.textInput}
-                value={postalCode}
-                onChangeText={setPostalCode}
-                placeholder="31-052"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.privacyNote}>
-          <Feather name="lock" size={13} color="#6b7280" style={{ marginRight: 6 }} />
-          <Text style={styles.privacyText}>Dokładny adres udostępnimy dopiero po rezerwacji.</Text>
-        </View>
-
-        {/* Price Section */}
-        <View style={styles.priceHeaderRow}>
-          <Text style={styles.sectionHeading}>Ustal cenę</Text>
-          <Text style={styles.currencyBadge}>PLN</Text>
-        </View>
-
-        <Text style={styles.inputLabel}>Cena za godzinę</Text>
-        <View style={styles.priceInputWrapper}>
-          <TextInput
-            style={styles.priceInput}
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="numeric"
-            placeholder="5,00"
-          />
-          <Text style={styles.priceUnit}>/ godz.</Text>
-        </View>
-
-        <View style={styles.priceHintBox}>
-          <Ionicons name="sparkles" size={18} color="#1b5e3a" style={{ marginRight: 8 }} />
-          <Text style={styles.hintText}>Miejsca w okolicy kosztują zwykle 4–8 zł za godz.</Text>
-        </View>
-
-        {/* Photos Section */}
-        <View style={styles.photosHeaderRow}>
-          <Text style={styles.sectionHeading}>Pokaż swoje miejsce</Text>
-          <Text style={styles.photosCounter}>2 / 5 zdjęć</Text>
-        </View>
-        <Text style={styles.photosSub}>Dodaj wyraźne zdjęcia wjazdu i miejsca parkingowego.</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
-          {/* Photo 1: Garage Front */}
-          <View style={styles.photoThumbWrapper}>
-            <Image source={garageHero} style={styles.photoThumb} resizeMode="cover" />
-            <View style={styles.mainBadge}>
-              <Text style={styles.mainBadgeText}>Główne</Text>
-            </View>
-          </View>
-
-          {/* Photo 2: Garage Interior */}
-          <View style={styles.photoThumbWrapper}>
-            <Image source={garageInterior} style={styles.photoThumb} resizeMode="cover" />
-            <TouchableOpacity style={styles.removePhotoBadge} activeOpacity={0.8}>
-              <Feather name="x" size={13} color="#111827" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Photo 3: Add button */}
-          <TouchableOpacity style={styles.addPhotoButton} activeOpacity={0.7}>
-            <Feather name="camera" size={24} color="#1b5e3a" style={{ marginBottom: 6 }} />
-            <Text style={styles.addPhotoLabel}>Dodaj zdjęcie</Text>
-          </TouchableOpacity>
-        </ScrollView>
-        <Text style={styles.photoFormatNote}>JPG lub PNG · Do 10 MB na zdjęcie</Text>
-
-        {/* Spot Type Section */}
-        <Text style={styles.sectionHeading}>Rodzaj miejsca</Text>
-        <View style={styles.typeOptionsRow}>
-          <TouchableOpacity
-            style={[styles.typeButton, selectedType === 'GARAGE' && styles.typeButtonSelected]}
-            onPress={() => setSelectedType('GARAGE')}
-            activeOpacity={0.8}
-          >
-            {selectedType === 'GARAGE' && (
-              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
-            )}
-            <Text
-              style={[styles.typeButtonText, selectedType === 'GARAGE' && styles.typeTextSelected]}
-            >
-              Garaż
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.typeButton, selectedType === 'DRIVEWAY' && styles.typeButtonSelected]}
-            onPress={() => setSelectedType('DRIVEWAY')}
-            activeOpacity={0.8}
-          >
-            {selectedType === 'DRIVEWAY' && (
-              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
-            )}
-            <Text
-              style={[
-                styles.typeButtonText,
-                selectedType === 'DRIVEWAY' && styles.typeTextSelected,
-              ]}
-            >
-              Podjazd
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.typeButton, selectedType === 'OUTDOOR' && styles.typeButtonSelected]}
-            onPress={() => setSelectedType('OUTDOOR')}
-            activeOpacity={0.8}
-          >
-            {selectedType === 'OUTDOOR' && (
-              <Feather name="check" size={16} color="#1b5e3a" style={{ marginRight: 6 }} />
-            )}
-            <Text
-              style={[styles.typeButtonText, selectedType === 'OUTDOOR' && styles.typeTextSelected]}
-            >
-              Na zewnątrz
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Action Button */}
+      {/* Mode Switcher Tabs */}
+      <View style={styles.tabSwitcher}>
         <TouchableOpacity
-          style={[styles.publishButton, isPublishing && styles.buttonDisabled]}
-          onPress={handlePublish}
-          disabled={isPublishing}
-          activeOpacity={0.85}
+          style={[styles.tabButton, mode === 'my_spots' && styles.tabButtonActive]}
+          onPress={() => {
+            setMode('my_spots');
+            fetchSpots(false);
+          }}
+          activeOpacity={0.8}
         >
-          <Text style={styles.publishButtonText}>
-            {isPublishing ? 'Publikowanie...' : 'Opublikuj miejsce'}
+          <Feather
+            name="list"
+            size={16}
+            color={mode === 'my_spots' ? '#1b5e3a' : '#6b7280'}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.tabButtonText, mode === 'my_spots' && styles.tabButtonTextActive]}>
+            Moje miejsca ({mySpots.length})
           </Text>
-          <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
 
-        <Text style={styles.disclaimerText}>
-          Publikując, akceptujesz regulamin gospodarzy. Cenę i dostępność możesz zmienić w każdej
-          chwili.
-        </Text>
-      </ScrollView>
+        <TouchableOpacity
+          style={[styles.tabButton, mode === 'add_form' && styles.tabButtonActive]}
+          onPress={() => setMode('add_form')}
+          activeOpacity={0.8}
+        >
+          <Feather
+            name="plus-circle"
+            size={16}
+            color={mode === 'add_form' ? '#1b5e3a' : '#6b7280'}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.tabButtonText, mode === 'add_form' && styles.tabButtonTextActive]}>
+            + Dodaj nowe
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* MODE 1: MY SPOTS LIST */}
+      {mode === 'my_spots' && (
+        <ScrollView
+          style={styles.flex1}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#1b5e3a" />
+          }
+        >
+          {isLoadingSpots ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color="#1b5e3a" />
+              <Text style={styles.loadingText}>Pobieranie Twoich miejsc...</Text>
+            </View>
+          ) : mySpots.length === 0 ? (
+            /* Empty State */
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="car-outline" size={44} color="#1b5e3a" />
+              </View>
+              <Text style={styles.emptyTitle}>Brak miejsc na Twoim koncie</Text>
+              <Text style={styles.emptyDescription}>
+                Nie dodałeś jeszcze żadnego miejsca parkingowego. Dodaj swoje pierwsze miejsce, aby zacząć zarabiać na wolnej przestrzeni.
+              </Text>
+              <TouchableOpacity
+                style={styles.addFirstButton}
+                onPress={() => setMode('add_form')}
+                activeOpacity={0.85}
+              >
+                <Feather name="plus" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                <Text style={styles.addFirstButtonText}>Dodaj pierwsze miejsce</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Spots Cards */
+            <View>
+              <View style={styles.listHeaderRow}>
+                <Text style={styles.listSectionTitle}>Twoje aktywne oferty</Text>
+                <TouchableOpacity onPress={() => setMode('add_form')} style={styles.miniAddLink}>
+                  <Text style={styles.miniAddText}>+ Dodaj kolejne</Text>
+                </TouchableOpacity>
+              </View>
+
+              {mySpots.map((spot) => (
+                <View key={spot.id} style={styles.spotCard}>
+                  {/* Card Header */}
+                  <View style={styles.spotCardHeader}>
+                    <View style={styles.flex1}>
+                      <Text style={styles.spotCardTitle} numberOfLines={1}>
+                        {spot.title}
+                      </Text>
+                      <View style={styles.addressRow}>
+                        <Feather name="map-pin" size={13} color="#6b7280" style={{ marginRight: 4 }} />
+                        <Text style={styles.spotCardAddress}>
+                          {spot.address_street}, {spot.address_city}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Active Pill Badge */}
+                    <View style={styles.activePill}>
+                      <View style={styles.activeDot} />
+                      <Text style={styles.activeText}>Aktywne</Text>
+                    </View>
+                  </View>
+
+                  {/* Card Details Badges */}
+                  <View style={styles.badgeRow}>
+                    <View style={styles.detailBadge}>
+                      <Ionicons name="pricetag-outline" size={12} color="#1b5e3a" style={{ marginRight: 4 }} />
+                      <Text style={styles.detailBadgeText}>{spot.hourly_rate} PLN / h</Text>
+                    </View>
+
+                    <View style={styles.detailBadge}>
+                      <Feather name="home" size={12} color="#4b5563" style={{ marginRight: 4 }} />
+                      <Text style={styles.detailBadgeText}>{getSpotTypeLabel(spot.spot_type)}</Text>
+                    </View>
+
+                    {spot.has_ev_charging && (
+                      <View style={[styles.detailBadge, styles.evBadge]}>
+                        <MaterialCommunityIcons name="ev-station" size={13} color="#059669" style={{ marginRight: 3 }} />
+                        <Text style={[styles.detailBadgeText, styles.evText]}>Stacja EV</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* PIN / Access Info if available */}
+                  {spot.gate_pin_code && (
+                    <View style={styles.pinRow}>
+                      <Feather name="key" size={12} color="#6b7280" style={{ marginRight: 5 }} />
+                      <Text style={styles.pinText}>PIN wjazdu: <Text style={styles.pinCode}>{spot.gate_pin_code}</Text></Text>
+                    </View>
+                  )}
+
+                  {/* Card Footer: Delete Action Button */}
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.cardOwnerNote}>Przypisane do Twojego konta</Text>
+
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteSpot(spot)}
+                      disabled={deletingSpotId === spot.id}
+                      activeOpacity={0.7}
+                    >
+                      {deletingSpotId === spot.id ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                      ) : (
+                        <>
+                          <Feather name="trash-2" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                          <Text style={styles.deleteButtonText}>Usuń miejsce</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* MODE 2: ADD FORM */}
+      {mode === 'add_form' && (
+        <ScrollView
+          style={styles.flex1}
+          contentContainerStyle={styles.formContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Form Title & Info */}
+          <Text style={styles.formSectionTitle}>Informacje podstawowe</Text>
+
+          <Text style={styles.inputLabel}>Tytuł / Nazwa miejsca (opcjonalnie)</Text>
+          <View style={styles.inputContainer}>
+            <Feather name="tag" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.textInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="np. Garaż podziemny - Pawia"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <Text style={styles.inputLabel}>Ulica i numer lokalu</Text>
+          <View style={styles.inputContainer}>
+            <Feather name="map-pin" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.textInput}
+              value={street}
+              onChangeText={setStreet}
+              placeholder="np. Pawia 5"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <View style={styles.row}>
+            <View style={[styles.flex1, { marginRight: 8 }]}>
+              <Text style={styles.inputLabel}>Miasto</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  value={city}
+                  onChangeText={setCity}
+                  placeholder="Kraków"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+            </View>
+
+            <View style={[styles.flex1, { marginLeft: 8 }]}>
+              <Text style={styles.inputLabel}>Cena za godzinę (PLN)</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="numeric"
+                  placeholder="8.50"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Spot Type Selection */}
+          <Text style={styles.formSectionTitle}>Rodzaj miejsca</Text>
+          <View style={styles.typeGrid}>
+            {[
+              { key: 'GARAGE', label: 'Garaż' },
+              { key: 'UNDERGROUND', label: 'Podziemny' },
+              { key: 'DRIVEWAY', label: 'Podjazd' },
+              { key: 'SURFACE', label: 'Naziemny' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.typeGridButton, spotType === item.key && styles.typeGridButtonActive]}
+                onPress={() => setSpotType(item.key as any)}
+                activeOpacity={0.8}
+              >
+                {spotType === item.key && (
+                  <Feather name="check" size={14} color="#1b5e3a" style={{ marginRight: 4 }} />
+                )}
+                <Text style={[styles.typeGridText, spotType === item.key && styles.typeGridTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Vehicle Size Selection */}
+          <Text style={styles.formSectionTitle}>Maksymalny pojazd</Text>
+          <View style={styles.typeGrid}>
+            {[
+              { key: 'COMPACT', label: 'Kompakt' },
+              { key: 'SEDAN', label: 'Sedan' },
+              { key: 'SUV', label: 'SUV' },
+              { key: 'VAN', label: 'Van / Bus' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.typeGridButton, vehicleSize === item.key && styles.typeGridButtonActive]}
+                onPress={() => setVehicleSize(item.key as any)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.typeGridText, vehicleSize === item.key && styles.typeGridTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Access Type & Gate PIN */}
+          <Text style={styles.formSectionTitle}>Dostęp i zabezpieczenia</Text>
+          <View style={styles.typeGrid}>
+            {[
+              { key: 'CODE_KEYPAD', label: 'Kod / Domofon' },
+              { key: 'BARRIER_PHONE', label: 'Telefon' },
+              { key: 'REMOTE', label: 'Pilot' },
+              { key: 'OPEN', label: 'Wjazd otwarty' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.typeGridButton, accessType === item.key && styles.typeGridButtonActive]}
+                onPress={() => setAccessType(item.key as any)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.typeGridText, accessType === item.key && styles.typeGridTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {accessType === 'CODE_KEYPAD' && (
+            <>
+              <Text style={styles.inputLabel}>Kod PIN do bramy / kłódki</Text>
+              <View style={styles.inputContainer}>
+                <Feather name="lock" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.textInput}
+                  value={gatePin}
+                  onChangeText={setGatePin}
+                  placeholder="np. 4921"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+            </>
+          )}
+
+          {/* EV Charging Checkbox */}
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() => setHasEv(!hasEv)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.checkboxBox, hasEv && styles.checkboxBoxActive]}>
+              {hasEv && <Feather name="check" size={14} color="#ffffff" />}
+            </View>
+            <Text style={styles.checkboxLabel}>Dostępna ładowarka aut elektrycznych (EV)</Text>
+          </TouchableOpacity>
+
+          {/* Submit Action Button */}
+          <TouchableOpacity
+            style={[styles.submitButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleCreateSpot}
+            disabled={isSubmitting}
+            activeOpacity={0.85}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <>
+                <Text style={styles.submitButtonText}>Opublikuj i przypisz do konta</Text>
+                <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
+              </>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.disclaimerText}>
+            Miejsce zostanie natychmiast zapisane w bazie danych PostgreSQL i zsynchronizowane z indeksem wyszukiwania.
+          </Text>
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -250,42 +531,283 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = ({ onSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f9fafb',
   },
-  scrollContainer: {
-    paddingTop: 52,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+  flex1: {
+    flex: 1,
   },
   header: {
+    paddingTop: 54,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     color: '#111827',
     letterSpacing: -0.5,
   },
-  saveDraft: {
-    fontSize: 14,
-    fontWeight: '600',
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    gap: 10,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  tabButtonActive: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#1b5e3a',
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4b5563',
+  },
+  tabButtonTextActive: {
     color: '#1b5e3a',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-    marginBottom: 20,
+  listContent: {
+    padding: 16,
+    paddingBottom: 40,
   },
-  sectionHeading: {
-    fontSize: 17,
+  centerContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: 20,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: '800',
     color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  addFirstButton: {
+    backgroundColor: '#1b5e3a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  addFirstButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  listSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  miniAddLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  miniAddText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1b5e3a',
+  },
+  spotCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  spotCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  spotCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  spotCardAddress: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+    marginRight: 5,
+  },
+  activeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065f46',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 8,
+  },
+  detailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  detailBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  evBadge: {
+    backgroundColor: '#d1fae5',
+  },
+  evText: {
+    color: '#065f46',
+    fontWeight: '700',
+  },
+  pinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  pinText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  pinCode: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  cardOwnerNote: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  deleteButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ef4444',
+  },
+  formContent: {
+    padding: 20,
+    paddingBottom: 50,
+  },
+  formSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+    marginTop: 14,
     marginBottom: 10,
-    marginTop: 12,
   },
   inputLabel: {
     fontSize: 13,
@@ -313,196 +835,83 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
   },
-  flex1: {
-    flex: 1,
-  },
-  privacyNote: {
+  typeGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  privacyText: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  priceHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  currencyBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6b7280',
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  priceInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 10,
-    backgroundColor: '#ffffff',
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  priceUnit: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  priceHintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  hintText: {
-    fontSize: 12,
-    color: '#1b5e3a',
-    fontWeight: '500',
-    flex: 1,
-  },
-  photosHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  photosCounter: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  photosSub: {
-    fontSize: 13,
-    color: '#6b7280',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 12,
   },
-  photosRow: {
+  typeGridButton: {
+    flexBasis: '48%',
+    flexGrow: 1,
     flexDirection: 'row',
-    marginBottom: 8,
-  },
-  photoThumbWrapper: {
-    width: 110,
-    height: 96,
-    borderRadius: 14,
-    marginRight: 12,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  photoThumb: {
-    width: '100%',
-    height: '100%',
-  },
-  mainBadge: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  mainBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  removePhotoBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#ffffff',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-  },
-  addPhotoButton: {
-    width: 110,
-    height: 96,
-    borderRadius: 14,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#d1d5db',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addPhotoLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#1b5e3a',
-  },
-  photoFormatNote: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginBottom: 16,
-  },
-  typeOptionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  typeButton: {
-    flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     borderRadius: 12,
-    paddingVertical: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
   },
-  typeButtonSelected: {
+  typeGridButtonActive: {
     borderColor: '#1b5e3a',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#ecfdf5',
   },
-  typeButtonText: {
+  typeGridText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#4b5563',
   },
-  typeTextSelected: {
+  typeGridTextActive: {
     color: '#1b5e3a',
   },
-  publishButton: {
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    backgroundColor: '#ffffff',
+  },
+  checkboxBoxActive: {
+    backgroundColor: '#1b5e3a',
+    borderColor: '#1b5e3a',
+  },
+  checkboxLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  submitButton: {
     backgroundColor: '#1b5e3a',
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 16,
     marginBottom: 12,
+    shadowColor: '#1b5e3a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  buttonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  publishButtonText: {
+  submitButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  buttonDisabled: {
+    backgroundColor: '#9ca3af',
   },
   disclaimerText: {
     fontSize: 11,

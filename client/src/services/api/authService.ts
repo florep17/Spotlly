@@ -1,5 +1,5 @@
 import { User } from '../../types/user';
-import { request, ApiError } from './apiClient';
+import { request, ApiError, setAuthToken } from './apiClient';
 
 export interface LoginResponse {
   access_token: string;
@@ -22,10 +22,14 @@ export const authService = {
     nickname?: string
   ): Promise<LoginResponse> {
     try {
-      return await request<LoginResponse>('/auth/login', {
+      const res = await request<LoginResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password, nickname }),
       });
+      if (res?.access_token) {
+        setAuthToken(res.access_token);
+      }
+      return res;
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
@@ -39,12 +43,14 @@ export const authService = {
         createdAt: new Date().toISOString(),
       };
 
-      return {
+      const mockResponse = {
         access_token: 'spotly_jwt_mock_token_dev_2026',
         token_type: 'Bearer',
         expires_in_seconds: 86400,
         user: mockUser,
       };
+      setAuthToken(mockResponse.access_token);
+      return mockResponse;
     }
   },
 
@@ -53,10 +59,14 @@ export const authService = {
    */
   async register(email: string, password: string, nickname: string): Promise<LoginResponse> {
     try {
-      return await request<LoginResponse>('/auth/register', {
+      const res = await request<LoginResponse>('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, password, nickname }),
       });
+      if (res?.access_token) {
+        setAuthToken(res.access_token);
+      }
+      return res;
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
@@ -69,13 +79,22 @@ export const authService = {
         createdAt: new Date().toISOString(),
       };
 
-      return {
+      const mockResponse = {
         access_token: 'spotly_jwt_mock_token_dev_2026',
         token_type: 'Bearer',
         expires_in_seconds: 86400,
         user: mockUser,
       };
+      setAuthToken(mockResponse.access_token);
+      return mockResponse;
     }
+  },
+
+  /**
+   * Wylogowanie - wyczyszczenie tokena
+   */
+  logout() {
+    setAuthToken(null);
   },
 
   /**
