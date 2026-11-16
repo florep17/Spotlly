@@ -1,8 +1,7 @@
-
 #pragma once
 
 #include "Spot.hpp"
-
+#include <vector>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -32,6 +31,22 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         return spots_.size();
     }
+
+
+    std::vector<Spot> findActiveSpots() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        std::vector<Spot> results;
+
+        for (const auto& [id, spot] : spots_) {
+            if (spot.isActive) {
+                results.push_back(spot);
+            }
+        }
+
+        return results;
+    }
+
 
 private:
     mutable std::mutex mutex_;
