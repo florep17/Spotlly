@@ -34,23 +34,9 @@ export const authService = {
       if (error instanceof ApiError) {
         throw error;
       }
-      // Fallback lokalny na czas pracy offline lub braku połączenia z backendem
-      const mockUser: User = {
-        id: 'u-450e12-b1',
-        email: email || 'driver@spotly.io',
-        fullName: nickname || (email ? email.split('@')[0] : 'Kierowca'),
-        role: 'BOTH',
-        createdAt: new Date().toISOString(),
-      };
-
-      const mockResponse = {
-        access_token: 'spotly_jwt_mock_token_dev_2026',
-        token_type: 'Bearer',
-        expires_in_seconds: 86400,
-        user: mockUser,
-      };
-      setAuthToken(mockResponse.access_token);
-      return mockResponse;
+      throw new Error(
+        'Brak połączenia z serwerem API. Upewnij się, że backend jest uruchomiony na porcie 8081.'
+      );
     }
   },
 
@@ -71,22 +57,9 @@ export const authService = {
       if (error instanceof ApiError) {
         throw error;
       }
-      const mockUser: User = {
-        id: `u-${Date.now().toString(36)}`,
-        email: email || 'driver@spotly.io',
-        fullName: nickname || (email ? email.split('@')[0] : 'Kierowca'),
-        role: 'BOTH',
-        createdAt: new Date().toISOString(),
-      };
-
-      const mockResponse = {
-        access_token: 'spotly_jwt_mock_token_dev_2026',
-        token_type: 'Bearer',
-        expires_in_seconds: 86400,
-        user: mockUser,
-      };
-      setAuthToken(mockResponse.access_token);
-      return mockResponse;
+      throw new Error(
+        'Brak połączenia z serwerem API. Upewnij się, że backend jest uruchomiony na porcie 8081.'
+      );
     }
   },
 

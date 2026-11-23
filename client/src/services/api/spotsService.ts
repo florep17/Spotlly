@@ -1,4 +1,9 @@
-import { ParkingSpot, SpotSearchParams, BackendSpotRequest, BackendSpotResponse } from '../../types/spot';
+import {
+  ParkingSpot,
+  SpotSearchParams,
+  BackendSpotRequest,
+  BackendSpotResponse,
+} from '../../types/spot';
 import { request } from './apiClient';
 
 /**

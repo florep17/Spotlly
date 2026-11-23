@@ -8,8 +8,8 @@ interface ProfileScreenProps {
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogout }) => {
-  const displayEmail = userEmail || 'janusz.lewandowski@spotly.io';
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Janusz Lewandowski';
+  const displayEmail = userEmail || 'uzytkownik@spotly.io';
+  const displayName = userEmail ? userEmail.split('@')[0] : 'Użytkownik';
   const initials = displayName.slice(0, 2).toUpperCase();
 
   return (

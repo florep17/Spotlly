@@ -53,5 +53,14 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     throw new ApiError(response.status, message);
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  const text = await response.text();
+  if (!text || !text.trim()) {
+    return {} as T;
+  }
+
+  return JSON.parse(text);
 }

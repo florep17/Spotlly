@@ -14,7 +14,6 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BackendSpotResponse, BackendSpotRequest } from '../types/spot';
 import { spotsService } from '../services/api/spotsService';
 import { getAuthToken } from '../services/api/apiClient';
-import { authService } from '../services/api/authService';
 
 interface AddSpotScreenProps {
   onSuccess?: () => void;
@@ -36,9 +35,13 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
   const [street, setStreet] = useState('Pawia 5');
   const [city, setCity] = useState('Kraków');
   const [price, setPrice] = useState('8.50');
-  const [spotType, setSpotType] = useState<'GARAGE' | 'UNDERGROUND' | 'DRIVEWAY' | 'SURFACE'>('GARAGE');
+  const [spotType, setSpotType] = useState<'GARAGE' | 'UNDERGROUND' | 'DRIVEWAY' | 'SURFACE'>(
+    'GARAGE'
+  );
   const [vehicleSize, setVehicleSize] = useState<'COMPACT' | 'SEDAN' | 'SUV' | 'VAN'>('SUV');
-  const [accessType, setAccessType] = useState<'CODE_KEYPAD' | 'BARRIER_PHONE' | 'REMOTE' | 'OPEN'>('CODE_KEYPAD');
+  const [accessType, setAccessType] = useState<'CODE_KEYPAD' | 'BARRIER_PHONE' | 'REMOTE' | 'OPEN'>(
+    'CODE_KEYPAD'
+  );
   const [gatePin, setGatePin] = useState('4921');
   const [hasEv, setHasEv] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,12 +51,13 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
     if (showLoader) setIsLoadingSpots(true);
     try {
       if (!getAuthToken()) {
-        await authService.loginWithEmail('host.test@spotly.io', 'Password123!', 'HostMax');
+        setMySpots([]);
+        return;
       }
       const data = await spotsService.getMySpots();
       setMySpots(data || []);
     } catch {
-      // In case of error, spots list stays empty or previous
+      // In case of error, spots list stays empty
     } finally {
       setIsLoadingSpots(false);
       setIsRefreshing(false);
@@ -61,8 +65,26 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
   }, []);
 
   useEffect(() => {
-    fetchSpots(true);
-  }, [fetchSpots]);
+    let isMounted = true;
+    (async () => {
+      if (!getAuthToken()) {
+        if (isMounted) setMySpots([]);
+        return;
+      }
+      if (isMounted) setIsLoadingSpots(true);
+      try {
+        const data = await spotsService.getMySpots();
+        if (isMounted) setMySpots(data || []);
+      } catch {
+        // In case of error, spots list stays empty
+      } finally {
+        if (isMounted) setIsLoadingSpots(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -83,11 +105,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             setDeletingSpotId(spot.id);
             try {
               await spotsService.deleteSpot(spot.id);
+              setMySpots((prev) => prev.filter((s) => s.id !== spot.id));
               Alert.alert('Usunięto', 'Miejsce parkingowe zostało usunięte z Twojego konta.');
-              // Refresh spots list
               await fetchSpots(false);
             } catch (error) {
-              const msg = error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania.';
+              const msg =
+                error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania.';
               Alert.alert('Błąd', msg);
             } finally {
               setDeletingSpotId(null);
@@ -100,7 +123,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
 
   // Handle Create Spot
   const handleCreateSpot = async () => {
-    const trimmedTitle = title.trim() || `Miejsce ${spotType === 'GARAGE' ? 'Garażowe' : 'Parkingowe'} - ${street}`;
+    const trimmedTitle =
+      title.trim() || `Miejsce ${spotType === 'GARAGE' ? 'Garażowe' : 'Parkingowe'} - ${street}`;
     const parsedPrice = parseFloat(price.replace(',', '.')) || 8.0;
 
     if (!street.trim()) {
@@ -125,7 +149,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
         is_active: true,
       };
 
-      await spotsService.createSpot(payload);
+      const createdSpot = await spotsService.createSpot(payload);
+      setMySpots((prev) => [createdSpot, ...prev.filter((s) => s.id !== createdSpot.id)]);
 
       Alert.alert(
         'Sukces! 🚀',
@@ -136,7 +161,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             onPress: () => {
               setTitle('');
               setMode('my_spots');
-              fetchSpots(true);
+              fetchSpots(false);
             },
           },
         ]
@@ -227,7 +252,11 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#1b5e3a" />
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor="#1b5e3a"
+            />
           }
         >
           {isLoadingSpots ? (
@@ -243,7 +272,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
               </View>
               <Text style={styles.emptyTitle}>Brak miejsc na Twoim koncie</Text>
               <Text style={styles.emptyDescription}>
-                Nie dodałeś jeszcze żadnego miejsca parkingowego. Dodaj swoje pierwsze miejsce, aby zacząć zarabiać na wolnej przestrzeni.
+                Nie dodałeś jeszcze żadnego miejsca parkingowego. Dodaj swoje pierwsze miejsce, aby
+                zacząć zarabiać na wolnej przestrzeni.
               </Text>
               <TouchableOpacity
                 style={styles.addFirstButton}
@@ -273,7 +303,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                         {spot.title}
                       </Text>
                       <View style={styles.addressRow}>
-                        <Feather name="map-pin" size={13} color="#6b7280" style={{ marginRight: 4 }} />
+                        <Feather
+                          name="map-pin"
+                          size={13}
+                          color="#6b7280"
+                          style={{ marginRight: 4 }}
+                        />
                         <Text style={styles.spotCardAddress}>
                           {spot.address_street}, {spot.address_city}
                         </Text>
@@ -290,7 +325,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                   {/* Card Details Badges */}
                   <View style={styles.badgeRow}>
                     <View style={styles.detailBadge}>
-                      <Ionicons name="pricetag-outline" size={12} color="#1b5e3a" style={{ marginRight: 4 }} />
+                      <Ionicons
+                        name="pricetag-outline"
+                        size={12}
+                        color="#1b5e3a"
+                        style={{ marginRight: 4 }}
+                      />
                       <Text style={styles.detailBadgeText}>{spot.hourly_rate} PLN / h</Text>
                     </View>
 
@@ -301,7 +341,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
 
                     {spot.has_ev_charging && (
                       <View style={[styles.detailBadge, styles.evBadge]}>
-                        <MaterialCommunityIcons name="ev-station" size={13} color="#059669" style={{ marginRight: 3 }} />
+                        <MaterialCommunityIcons
+                          name="ev-station"
+                          size={13}
+                          color="#059669"
+                          style={{ marginRight: 3 }}
+                        />
                         <Text style={[styles.detailBadgeText, styles.evText]}>Stacja EV</Text>
                       </View>
                     )}
@@ -311,7 +356,9 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                   {spot.gate_pin_code && (
                     <View style={styles.pinRow}>
                       <Feather name="key" size={12} color="#6b7280" style={{ marginRight: 5 }} />
-                      <Text style={styles.pinText}>PIN wjazdu: <Text style={styles.pinCode}>{spot.gate_pin_code}</Text></Text>
+                      <Text style={styles.pinText}>
+                        PIN wjazdu: <Text style={styles.pinCode}>{spot.gate_pin_code}</Text>
+                      </Text>
                     </View>
                   )}
 
@@ -329,7 +376,12 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                         <ActivityIndicator size="small" color="#ef4444" />
                       ) : (
                         <>
-                          <Feather name="trash-2" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                          <Feather
+                            name="trash-2"
+                            size={14}
+                            color="#ef4444"
+                            style={{ marginRight: 6 }}
+                          />
                           <Text style={styles.deleteButtonText}>Usuń miejsce</Text>
                         </>
                       )}
@@ -416,14 +468,19 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             ].map((item) => (
               <TouchableOpacity
                 key={item.key}
-                style={[styles.typeGridButton, spotType === item.key && styles.typeGridButtonActive]}
+                style={[
+                  styles.typeGridButton,
+                  spotType === item.key && styles.typeGridButtonActive,
+                ]}
                 onPress={() => setSpotType(item.key as any)}
                 activeOpacity={0.8}
               >
                 {spotType === item.key && (
                   <Feather name="check" size={14} color="#1b5e3a" style={{ marginRight: 4 }} />
                 )}
-                <Text style={[styles.typeGridText, spotType === item.key && styles.typeGridTextActive]}>
+                <Text
+                  style={[styles.typeGridText, spotType === item.key && styles.typeGridTextActive]}
+                >
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -441,11 +498,19 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             ].map((item) => (
               <TouchableOpacity
                 key={item.key}
-                style={[styles.typeGridButton, vehicleSize === item.key && styles.typeGridButtonActive]}
+                style={[
+                  styles.typeGridButton,
+                  vehicleSize === item.key && styles.typeGridButtonActive,
+                ]}
                 onPress={() => setVehicleSize(item.key as any)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeGridText, vehicleSize === item.key && styles.typeGridTextActive]}>
+                <Text
+                  style={[
+                    styles.typeGridText,
+                    vehicleSize === item.key && styles.typeGridTextActive,
+                  ]}
+                >
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -463,11 +528,19 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             ].map((item) => (
               <TouchableOpacity
                 key={item.key}
-                style={[styles.typeGridButton, accessType === item.key && styles.typeGridButtonActive]}
+                style={[
+                  styles.typeGridButton,
+                  accessType === item.key && styles.typeGridButtonActive,
+                ]}
                 onPress={() => setAccessType(item.key as any)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeGridText, accessType === item.key && styles.typeGridTextActive]}>
+                <Text
+                  style={[
+                    styles.typeGridText,
+                    accessType === item.key && styles.typeGridTextActive,
+                  ]}
+                >
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -520,7 +593,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
           </TouchableOpacity>
 
           <Text style={styles.disclaimerText}>
-            Miejsce zostanie natychmiast zapisane w bazie danych PostgreSQL i zsynchronizowane z indeksem wyszukiwania.
+            Miejsce zostanie natychmiast zapisane w bazie danych PostgreSQL i zsynchronizowane z
+            indeksem wyszukiwania.
           </Text>
         </ScrollView>
       )}

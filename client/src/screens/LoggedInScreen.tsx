@@ -46,7 +46,7 @@ export const LoggedInScreen: React.FC<LoggedInScreenProps> = ({
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>E-mail:</Text>
-            <Text style={styles.infoValue}>{email || 'kierowca@spotly.io'}</Text>
+            <Text style={styles.infoValue}>{email || '-'}</Text>
           </View>
 
           <View style={styles.divider} />
