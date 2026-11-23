@@ -17,6 +17,8 @@ public class SpotSyncRequest {
     @JsonProperty("spot_id")
     private String spotId;
 
+    private long revision;
+
     private BigDecimal latitude;
     private BigDecimal longitude;
 

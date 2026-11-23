@@ -31,7 +31,7 @@ public class CrowEngineClient {
      */
     public boolean syncSpot(SpotSyncRequest request) {
         try {
-            log.info("Sending spot sync to C++ Crow engine: spotId={}, isActive={}", request.getSpotId(), request.getIsActive());
+            log.debug("Sending spot sync to C++ Crow engine: spotId={}, isActive={}", request.getSpotId(), request.getIsActive());
             SpotSyncResponse response = webClient.post()
                     .uri("/api/v1/engine/spots/sync")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -41,10 +41,11 @@ public class CrowEngineClient {
                     .timeout(Duration.ofMillis(2000))
                     .block();
 
-            log.info("C++ Crow engine sync response for spot {}: status={}, rtreeNodes={}",
+            log.debug("C++ Crow engine sync response for spot {}: status={}, rtreeNodes={}",
                     request.getSpotId(), response != null ? response.getStatus() : null,
                     response != null ? response.getRtreeNodeCount() : null);
-            return response != null;
+            return response != null && "synced".equals(response.getStatus())
+                    && request.getSpotId().equals(response.getSpotId());
         } catch (Exception e) {
             log.warn("C++ Crow engine sync call failed for spot {}: {}", request.getSpotId(), e.getMessage());
             return false;

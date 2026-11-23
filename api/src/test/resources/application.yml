@@ -17,3 +17,5 @@ spotly:
   jwt:
     secret: spotly-super-secret-jwt-signing-key-minimum-256-bits-length-for-hmac-sha256
     expiration-seconds: 86400
+  search-engine:
+    replay-cron: "-"

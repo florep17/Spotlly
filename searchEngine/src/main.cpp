@@ -2,11 +2,35 @@
 #include "crow.h"
 #include "SpotStore.hpp"
 
+#include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace {
+
+std::optional<double> finiteNumber(const crow::json::rvalue& number) {
+    const auto raw = static_cast<std::string>(number);
+    char* end = nullptr;
+    const double value = std::strtod(raw.c_str(), &end);
+    if (end == raw.c_str() || end != raw.c_str() + raw.size() || !std::isfinite(value)) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+crow::response syncResponse(const std::string& spotId, spotly::SpotStore::SyncResult sync) {
+    crow::json::wvalue result;
+    result["spot_id"] = spotId;
+    result["status"] = sync.applied ? "synced" : "stale";
+    result["rtree_node_count"] = sync.indexSize;
+    return crow::response(std::move(result));
+}
+
+}  // namespace
 
 int main() {
     crow::SimpleApp app;
@@ -41,6 +65,33 @@ int main() {
                     return crow::response(400, "Empty spot_id");
                 }
 
+                if (!body.has("is_active") ||
+                    (body["is_active"].t() !=
+                         crow::json::type::True &&
+                     body["is_active"].t() !=
+                         crow::json::type::False)) {
+                    return crow::response(
+                        400, "Missing or invalid is_active");
+                }
+
+                std::int64_t revision = 0;
+                if (body.has("revision")) {
+                    if (body["revision"].t() != crow::json::type::Number) {
+                        return crow::response(400, "Invalid revision");
+                    }
+                    const auto value = static_cast<std::string>(body["revision"]);
+                    const auto end = value.data() + value.size();
+                    const auto parsed = std::from_chars(value.data(), end, revision);
+                    if (parsed.ec != std::errc{} || parsed.ptr != end || revision < 0) {
+                        return crow::response(400, "Invalid revision");
+                    }
+                }
+
+                if (!body["is_active"].b()) {
+                    return syncResponse(spotId, spotStore.upsert(
+                        spotly::Spot{spotId, 0, 0, 0, {}, std::nullopt, false, false, revision}));
+                }
+
                 if (!body.has("latitude") ||
                     !body.has("longitude") ||
                     !body.has("hourly_rate")) {
@@ -71,15 +122,6 @@ int main() {
                         400, "Missing or invalid has_ev_charging");
                 }
 
-                if (!body.has("is_active") ||
-                    (body["is_active"].t() !=
-                         crow::json::type::True &&
-                     body["is_active"].t() !=
-                         crow::json::type::False)) {
-                    return crow::response(
-                        400, "Missing or invalid is_active");
-                }
-
                 if (body.has("max_height_meters") &&
                     body["max_height_meters"].t() !=
                         crow::json::type::Null &&
@@ -89,16 +131,13 @@ int main() {
                         400, "Invalid max_height_meters");
                 }
 
-                const double latitude = body["latitude"].d();
-                const double longitude = body["longitude"].d();
-                const double hourlyRate = body["hourly_rate"].d();
+                const auto latitude = finiteNumber(body["latitude"]);
+                const auto longitude = finiteNumber(body["longitude"]);
+                const auto hourlyRate = finiteNumber(body["hourly_rate"]);
 
-                if (!std::isfinite(latitude) ||
-                    latitude < -90.0 || latitude > 90.0 ||
-                    !std::isfinite(longitude) ||
-                    longitude < -180.0 || longitude > 180.0 ||
-                    !std::isfinite(hourlyRate) ||
-                    hourlyRate < 0.0) {
+                if (!latitude || *latitude < -90.0 || *latitude > 90.0 ||
+                    !longitude || *longitude < -180.0 || *longitude > 180.0 ||
+                    !hourlyRate || *hourlyRate < 0.0) {
                     return crow::response(
                         400, "Invalid coordinates or hourly_rate values");
                 }
@@ -109,18 +148,14 @@ int main() {
                 const bool hasEvCharging =
                     body["has_ev_charging"].b();
 
-                const bool isActive =
-                    body["is_active"].b();
-
                 std::optional<double> maxHeightMeters = std::nullopt;
 
                 if (body.has("max_height_meters") &&
                     body["max_height_meters"].t() !=
                         crow::json::type::Null) {
-                    maxHeightMeters =
-                        body["max_height_meters"].d();
+                    maxHeightMeters = finiteNumber(body["max_height_meters"]);
 
-                    if (!std::isfinite(*maxHeightMeters) ||
+                    if (!maxHeightMeters ||
                         *maxHeightMeters < 0.0) {
                         return crow::response(
                             400, "Invalid max_height_meters value");
@@ -129,27 +164,17 @@ int main() {
 
                 spotly::Spot spot{
                     spotId,
-                    latitude,
-                    longitude,
-                    hourlyRate,
+                    *latitude,
+                    *longitude,
+                    *hourlyRate,
                     maxVehicleSize,
                     maxHeightMeters,
                     hasEvCharging,
-                    isActive
+                    true,
+                    revision
                 };
 
-                spotStore.upsert(spot);
-
-                crow::json::wvalue result;
-                result["spot_id"] = spotId;
-                result["status"] = "synced";
-
-                crow::response response(200);
-                response.set_header(
-                    "Content-Type", "application/json");
-                response.body = result.dump();
-
-                return response;
+                return syncResponse(spotId, spotStore.upsert(spot));
             });
 
     // Search for active parking spots

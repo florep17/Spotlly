@@ -1,6 +1,7 @@
 package io.spotly.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.spotly.client.CrowEngineClient;
 import io.spotly.dto.engine.SpotSyncRequest;
 import io.spotly.dto.spot.SpotRequest;
@@ -9,6 +10,7 @@ import io.spotly.entity.User;
 import io.spotly.repository.ParkingSpotRepository;
 import io.spotly.repository.UserRepository;
 import io.spotly.service.JwtService;
+import io.spotly.service.SpotEngineSync;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,9 @@ class SpotControllerTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private SpotEngineSync spotEngineSync;
 
     @MockBean
     private CrowEngineClient crowEngineClient;
@@ -152,6 +157,74 @@ class SpotControllerTest {
 
         // Verify database persistence
         assertThat(parkingSpotRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void persistsBeforeContactingCrowAndReplaysAfterFailure() throws Exception {
+        SpotRequest request = validSpotRequest();
+        when(crowEngineClient.syncSpot(any())).thenAnswer(call -> {
+            SpotSyncRequest sent = call.getArgument(0);
+            ParkingSpot stored = parkingSpotRepository.findById(UUID.fromString(sent.getSpotId()))
+                    .orElseThrow();
+            assertThat(stored.getSyncStatus()).isEqualTo("PENDING");
+            assertThat(stored.getSyncRevision()).isEqualTo(sent.getRevision());
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()).isFalse();
+            return false;
+        });
+
+        mockMvc.perform(post("/api/v1/spots").header("Authorization", host1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sync_status").value("PENDING"));
+
+        ParkingSpot spot = parkingSpotRepository.findAll().getFirst();
+        doReturn(true).when(crowEngineClient).syncSpot(any());
+        spotEngineSync.replaySpots();
+
+        assertThat(parkingSpotRepository.findById(spot.getId()).orElseThrow().getSyncStatus())
+                .isEqualTo("SYNCED_TO_CPP_ENGINE");
+
+        doReturn(false).when(crowEngineClient).syncSpot(any());
+        mockMvc.perform(delete("/api/v1/spots/" + spot.getId()).header("Authorization", host1Token))
+                .andExpect(status().isNoContent());
+        ParkingSpot inactive = parkingSpotRepository.findById(spot.getId()).orElseThrow();
+        assertThat(inactive.getIsActive()).isFalse();
+        assertThat(inactive.getSyncStatus()).isEqualTo("PENDING");
+        assertThat(parkingSpotRepository.acknowledgeEngineSync(spot.getId(), spot.getSyncRevision())).isZero();
+
+        doReturn(true).when(crowEngineClient).syncSpot(any());
+        spotEngineSync.replaySpots();
+        verify(crowEngineClient, times(2)).syncSpot(argThat(sent ->
+                !sent.getIsActive() && sent.getRevision() == inactive.getSyncRevision()));
+        assertThat(parkingSpotRepository.findById(spot.getId()).orElseThrow().getSyncStatus())
+                .isEqualTo("SYNCED_TO_CPP_ENGINE");
+    }
+
+    @Test
+    void rejectsOutOfRangeGpsBeforePersistenceOrSync() throws Exception {
+        SpotRequest request = validSpotRequest();
+        request.setLatitude(new BigDecimal("90.0000001"));
+        request.setLongitude(new BigDecimal("-180.0000001"));
+
+        mockMvc.perform(post("/api/v1/spots").header("Authorization", host1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.latitude").isString())
+                .andExpect(jsonPath("$.details.longitude").isString());
+
+        assertThat(parkingSpotRepository.count()).isZero();
+        verifyNoInteractions(crowEngineClient);
+    }
+
+    private SpotRequest validSpotRequest() {
+        return SpotRequest.builder()
+                .title("Garage").latitude(new BigDecimal("50")).longitude(new BigDecimal("19"))
+                .addressStreet("Pawia 5").addressCity("Kraków")
+                .spotType("GARAGE").maxVehicleSize("SUV").accessType("OPEN")
+                .hourlyRate(new BigDecimal("10.00")).build();
     }
 
     @Test
@@ -270,8 +343,8 @@ class SpotControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/spots/{id} - should delete spot and notify C++ engine (isActive=false)")
-    void shouldDeleteSpotAndNotifyCppEngine() throws Exception {
+    @DisplayName("DELETE /api/v1/spots/{id} - should deactivate spot and notify C++ engine (isActive=false)")
+    void shouldDeactivateSpotAndNotifyCppEngine() throws Exception {
         ParkingSpot spot = ParkingSpot.builder()
                 .owner(host1)
                 .title("Spot to Delete")
@@ -295,8 +368,21 @@ class SpotControllerTest {
         verify(crowEngineClient, times(1)).syncSpot(syncCaptor.capture());
         assertThat(syncCaptor.getValue().getIsActive()).isFalse();
 
-        // Verify deleted from DB
-        assertThat(parkingSpotRepository.existsById(spot.getId())).isFalse();
+        ParkingSpot persisted = parkingSpotRepository.findById(spot.getId()).orElseThrow();
+        assertThat(persisted.getIsActive()).isFalse();
+        assertThat(persisted.getSyncStatus()).isEqualTo("SYNCED_TO_CPP_ENGINE");
+
+        mockMvc.perform(get("/api/v1/spots/" + spot.getId()).header("Authorization", host1Token))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/spots/all").header("Authorization", host1Token))
+                .andExpect(jsonPath("$.length()").value(0));
+
+        ObjectNode edit = objectMapper.valueToTree(validSpotRequest());
+        edit.remove("is_active");
+        mockMvc.perform(put("/api/v1/spots/" + spot.getId()).header("Authorization", host1Token)
+                        .contentType(MediaType.APPLICATION_JSON).content(edit.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.is_active").value(false));
     }
 
     @Test

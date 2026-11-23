@@ -4,6 +4,7 @@ import io.spotly.dto.spot.SpotRequest;
 import io.spotly.dto.spot.SpotResponse;
 import io.spotly.dto.spot.PublicSpotResponse;
 import io.spotly.service.SpotService;
+import io.spotly.service.SpotEngineSync;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class SpotController {
 
     private final SpotService spotService;
+    private final SpotEngineSync spotEngineSync;
 
     @PostMapping
     @Operation(
@@ -35,7 +37,7 @@ public class SpotController {
             description = "Creates a parking spot for the authenticated host, persists to PostgreSQL, and syncs coordinates/metadata to C++ Crow R-Tree engine."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Parking spot created and synchronized to C++ engine"),
+            @ApiResponse(responseCode = "201", description = "Parking spot committed. Engine synchronization can be pending."),
             @ApiResponse(responseCode = "400", description = "Invalid request payload or validation failure"),
             @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer JWT token")
     })
@@ -44,7 +46,7 @@ public class SpotController {
             @AuthenticationPrincipal Jwt jwt) {
         String ownerId = jwt.getSubject();
         SpotResponse response = spotService.createSpot(request, ownerId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(spotEngineSync.sync(response));
     }
 
     @PutMapping("/{id}")
@@ -53,7 +55,7 @@ public class SpotController {
             description = "Updates parking spot attributes in PostgreSQL and synchronizes new coordinates/rate/constraints with C++ Crow engine."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Parking spot successfully updated and synchronized"),
+            @ApiResponse(responseCode = "200", description = "Parking spot updated. Engine synchronization can be pending."),
             @ApiResponse(responseCode = "400", description = "Invalid request payload or validation failure"),
             @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer JWT token"),
             @ApiResponse(responseCode = "403", description = "Forbidden: Logged-in user is not the owner of this spot"),
@@ -65,16 +67,16 @@ public class SpotController {
             @AuthenticationPrincipal Jwt jwt) {
         String ownerId = jwt.getSubject();
         SpotResponse response = spotService.updateSpot(id, request, ownerId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(spotEngineSync.sync(response));
     }
 
     @DeleteMapping("/{id}")
     @Operation(
-            summary = "Delete or deactivate a parking spot",
-            description = "Deletes or deactivates the spot from PostgreSQL and removes the coordinate node from C++ Crow R-Tree index."
+            summary = "Deactivate a parking spot",
+            description = "Deactivates the PostgreSQL listing and queues its removal from the C++ R-tree if the engine is unavailable."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Parking spot successfully deleted/deactivated"),
+            @ApiResponse(responseCode = "204", description = "Parking spot deactivated"),
             @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer JWT token"),
             @ApiResponse(responseCode = "403", description = "Forbidden: Logged-in user is not the owner of this spot"),
             @ApiResponse(responseCode = "404", description = "Parking spot not found")
@@ -83,7 +85,8 @@ public class SpotController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         String ownerId = jwt.getSubject();
-        spotService.deleteSpot(id, ownerId);
+        spotService.deactivateSpot(id, ownerId);
+        spotEngineSync.sync(id);
         return ResponseEntity.noContent().build();
     }
 

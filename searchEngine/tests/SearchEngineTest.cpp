@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Ranking.hpp"
+#include "SpotStore.hpp"
 
 TEST(SearchEngineTest, BasicArithmetic) { EXPECT_EQ(2 + 2, 4); }
 
@@ -45,4 +46,30 @@ TEST(RankingTest, HandlesEmptyParkingSpotList) {
     std::vector<spotly::RankedSpot> rankedSpots = spotly::rankParkingSpots(spots);
 
     EXPECT_TRUE(rankedSpots.empty());
+}
+
+TEST(SpotStoreTest, MovesAndDeactivatesIndexedSpotsWithoutRestoringOlderRevisions) {
+    spotly::SpotStore store;
+    spotly::Spot spot{"spot", 50, 19, 10, "SUV", std::nullopt, false, true, 1};
+
+    EXPECT_EQ(store.upsert(spot).indexSize, 1);
+    EXPECT_EQ(store.upsert(spot).indexSize, 1);
+
+    spot.longitude = 20;
+    spot.revision = 2;
+    EXPECT_EQ(store.upsert(spot).indexSize, 1);
+    const auto updated = store.findActiveSpots();
+    ASSERT_EQ(updated.size(), 1);
+    EXPECT_DOUBLE_EQ(updated.front().longitude, 20);
+
+    auto inactive = spot;
+    inactive.isActive = false;
+    inactive.revision = 3;
+    EXPECT_EQ(store.upsert(inactive).indexSize, 0);
+    EXPECT_EQ(store.upsert(inactive).indexSize, 0);
+    EXPECT_FALSE(store.upsert(spot).applied);
+    EXPECT_TRUE(store.findActiveSpots().empty());
+
+    spot.revision = 4;
+    EXPECT_EQ(store.upsert(spot).indexSize, 1);
 }

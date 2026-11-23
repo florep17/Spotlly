@@ -68,6 +68,8 @@ Handles business logic, REST API communication, parking reservations, payment si
 
 Responsible for parking availability filtering, matching algorithms, and ranking parking spaces based on location and availability.
 
+Building the C++ engine requires Boost headers and standalone Asio. On macOS, install them with `brew install boost asio`. Build and test with `cmake -S searchEngine -B searchEngine/build`, `cmake --build searchEngine/build`, and `ctest --test-dir searchEngine/build --output-on-failure`.
+
 **PostgreSQL** is used for persistent data storage.
 
 ## Main Use Cases

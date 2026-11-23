@@ -1,14 +1,11 @@
 package io.spotly.service;
 
-import io.spotly.client.CrowEngineClient;
-import io.spotly.dto.engine.SpotSyncRequest;
 import io.spotly.dto.spot.SpotRequest;
 import io.spotly.dto.spot.SpotResponse;
 import io.spotly.dto.spot.PublicSpotResponse;
 import io.spotly.entity.ParkingSpot;
 import io.spotly.entity.User;
 import io.spotly.repository.ParkingSpotRepository;
-import io.spotly.repository.BookingRepository;
 import io.spotly.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +23,7 @@ import java.util.UUID;
 public class SpotService {
 
     private final ParkingSpotRepository parkingSpotRepository;
-    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
-    private final CrowEngineClient crowEngineClient;
 
     @Transactional
     public SpotResponse createSpot(SpotRequest request, String ownerId) {
@@ -56,32 +51,12 @@ public class SpotService {
                 .syncStatus("PENDING")
                 .build();
 
-        // 1. Save to PostgreSQL first to generate UUID and persist
-        spot = parkingSpotRepository.save(spot);
-
-        // 2. Synchronize with C++ Crow engine R-Tree
-        SpotSyncRequest syncRequest = SpotSyncRequest.builder()
-                .spotId(spot.getId().toString())
-                .latitude(spot.getLatitude())
-                .longitude(spot.getLongitude())
-                .hourlyRate(spot.getHourlyRate())
-                .maxVehicleSize(spot.getMaxVehicleSize())
-                .maxHeightMeters(spot.getMaxHeightMeters())
-                .hasEvCharging(spot.getHasEvCharging())
-                .isActive(spot.getIsActive())
-                .build();
-
-        boolean synced = crowEngineClient.syncSpot(syncRequest);
-        spot.setSyncStatus(synced ? "SYNCED_TO_CPP_ENGINE" : "PENDING");
-        spot = parkingSpotRepository.save(spot);
-
-        log.info("Created and synced parking spot {} for owner {}", spot.getId(), ownerId);
-        return SpotResponse.fromEntity(spot);
+        return SpotResponse.fromEntity(parkingSpotRepository.save(spot));
     }
 
     @Transactional
     public SpotResponse updateSpot(UUID id, SpotRequest request, String ownerId) {
-        ParkingSpot spot = parkingSpotRepository.findById(id)
+        ParkingSpot spot = parkingSpotRepository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parking spot with ID " + id + " not found"));
 
         if (!spot.getOwner().getId().equals(ownerId)) {
@@ -110,59 +85,28 @@ public class SpotService {
             spot.setIsActive(request.getIsActive());
         }
 
-        // Synchronize updated state with C++ Crow engine
-        SpotSyncRequest syncRequest = SpotSyncRequest.builder()
-                .spotId(spot.getId().toString())
-                .latitude(spot.getLatitude())
-                .longitude(spot.getLongitude())
-                .hourlyRate(spot.getHourlyRate())
-                .maxVehicleSize(spot.getMaxVehicleSize())
-                .maxHeightMeters(spot.getMaxHeightMeters())
-                .hasEvCharging(spot.getHasEvCharging())
-                .isActive(spot.getIsActive())
-                .build();
-
-        boolean synced = crowEngineClient.syncSpot(syncRequest);
-        spot.setSyncStatus(synced ? "SYNCED_TO_CPP_ENGINE" : "PENDING");
-        spot = parkingSpotRepository.save(spot);
-
-        log.info("Updated and synced parking spot {} for owner {}", id, ownerId);
+        markPending(spot);
         return SpotResponse.fromEntity(spot);
     }
 
     @Transactional
-    public void deleteSpot(UUID id, String ownerId) {
-        ParkingSpot spot = parkingSpotRepository.findById(id)
+    public void deactivateSpot(UUID id, String ownerId) {
+        ParkingSpot spot = parkingSpotRepository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parking spot with ID " + id + " not found"));
 
         if (!spot.getOwner().getId().equals(ownerId)) {
-            log.warn("User {} attempted to delete spot {} owned by {}", ownerId, id, spot.getOwner().getId());
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this parking spot");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to deactivate this parking spot");
         }
 
-        // Notify C++ Crow engine to remove spot from R-Tree spatial index (isActive = false)
-        SpotSyncRequest syncRequest = SpotSyncRequest.builder()
-                .spotId(spot.getId().toString())
-                .latitude(spot.getLatitude())
-                .longitude(spot.getLongitude())
-                .hourlyRate(spot.getHourlyRate())
-                .maxVehicleSize(spot.getMaxVehicleSize())
-                .maxHeightMeters(spot.getMaxHeightMeters())
-                .hasEvCharging(spot.getHasEvCharging())
-                .isActive(false)
-                .build();
-
-        crowEngineClient.syncSpot(syncRequest);
-
-        if (bookingRepository.existsBySpotId(id)) {
+        if (Boolean.TRUE.equals(spot.getIsActive())) {
             spot.setIsActive(false);
-            spot.setSyncStatus("DEACTIVATED");
-            parkingSpotRepository.save(spot);
-        } else {
-            parkingSpotRepository.delete(spot);
-            parkingSpotRepository.flush();
-            log.info("Permanently deleted parking spot {}", id);
+            markPending(spot);
         }
+    }
+
+    private void markPending(ParkingSpot spot) {
+        spot.setSyncRevision(spot.getSyncRevision() + 1);
+        spot.setSyncStatus("PENDING");
     }
 
     @Transactional(readOnly = true)

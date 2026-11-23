@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
+find_package(Boost REQUIRED CONFIG)
 
 # Crow HTTP framework
 set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -31,7 +32,7 @@ target_include_directories(spotly_search_engine
 )
 
 target_link_libraries(spotly_search_engine
-    PRIVATE Crow::Crow
+    PRIVATE Crow::Crow Boost::headers
 )
 
 
@@ -61,7 +62,7 @@ target_include_directories(spotly_tests
 
 
     target_link_libraries(spotly_tests
-        PRIVATE GTest::gtest_main
+        PRIVATE GTest::gtest_main Boost::headers
     )
 
     include(GoogleTest)
