@@ -1,5 +1,6 @@
 package io.spotly.dto.spot;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.spotly.entity.ParkingSpot;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -90,6 +91,9 @@ public class SpotResponse {
     @Schema(description = "Synchronization status with C++ Crow engine", example = "SYNCED_TO_CPP_ENGINE")
     private String syncStatus;
 
+    @JsonIgnore
+    private long syncRevision;
+
     @JsonProperty("created_at")
     @Schema(description = "Spot creation timestamp", example = "2026-10-15T14:00:00Z")
     private Instant createdAt;
@@ -118,6 +122,7 @@ public class SpotResponse {
                 .hourlyRate(spot.getHourlyRate())
                 .isActive(spot.getIsActive())
                 .syncStatus(spot.getSyncStatus())
+                .syncRevision(spot.getSyncRevision())
                 .createdAt(spot.getCreatedAt())
                 .build();
     }

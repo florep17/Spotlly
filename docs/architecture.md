@@ -16,6 +16,17 @@ Widok ten łączy pozostałe perspektywy i bazuje na opracowanych wymaganiach fu
 
 Szczegółowa specyfikacja wymagań znajduje się w [`.specify/spec.md`](file:///Users/floriankurpiela/Desktop/STUDIA/Spotlly/.specify/spec.md) oraz [`docs/requirements.md`](file:///Users/floriankurpiela/Desktop/STUDIA/Spotlly/docs/requirements.md).
 
+### Przepływ właściciela przy zapisie miejsca
+
+| Scenariusz | Zachowanie systemu |
+| --- | --- |
+| Dodanie lub zmiana miejsca | Spring zatwierdza zapis w PostgreSQL, odczytuje zapisany stan i wywołuje `POST /api/v1/engine/spots/sync`. Crow od razu aktualizuje R-tree i potwierdza synchronizację. |
+| Brakujące lub błędne GPS | Spring zwraca `400` przed zapisem. Szerokość musi mieścić się w zakresie −90 do 90, a długość od −180 do 180. Crow powtarza walidację aktywnych wpisów przed zmianą indeksu. |
+| Crow jest niedostępny lub odpowiada po czasie | Próba wysłania kończy się po maksymalnie 2 s. Zapis pozostaje w PostgreSQL ze statusem `PENDING`. Spring domyślnie co 15 s inicjuje ponowne wysłanie zapisanych stanów. Ten sam mechanizm odbudowuje indeks po restarcie Crow. |
+| Deaktywacja przez właściciela | `DELETE /api/v1/spots/{id}` ustawia `is_active=false` i zwraca `204`. Rekord i istniejące rezerwacje zostają w bazie. Publiczne API Spring od razu ukrywa miejsce, a nowe rezerwacje są odrzucane. Jeżeli Crow jest niedostępny, jego wewnętrzny indeks może zwracać poprzedni stan aż do ponowienia synchronizacji. |
+
+Każda zmiana miejsca zwiększa jego `sync_revision`. Crow usuwa poprzedni punkt przy zmianie współrzędnych i pamięta także rewizję zdezaktywowanego miejsca, dzięki czemu spóźnione żądanie nie przywraca go do wyników. Endpoint `GET /api/v1/engine/spots/search` odczytuje aktywne miejsca z drzewa w pamięci.
+
 ---
 
 ## 2. Widok Deweloperski / Struktury (UML Component Diagram)
@@ -45,6 +56,7 @@ graph TD
         
         Spot_Svc["SpotService & Validator"]
         Book_Svc["BookingService & Pessimistic Lock"]
+        Spot_Sync["SpotEngineSync"]
         Crow_Client["CrowEngineClient (WebClient)"]
 
         Sec_Filter --> Auth_Ctrl
@@ -53,8 +65,8 @@ graph TD
 
         Spot_Ctrl --> Spot_Svc
         Book_Ctrl --> Book_Svc
-        Spot_Svc --> Crow_Client
-        Book_Svc --> Crow_Client
+        Spot_Ctrl -->|"po zatwierdzeniu zapisu"| Spot_Sync
+        Spot_Sync --> Crow_Client
     end
 
     subgraph EngineLayer ["Warstwa Obliczeniowa — C++20 Crow Engine (Zuzanna)"]
@@ -78,6 +90,7 @@ graph TD
     API_Client -->|"HTTPS / JSON (Bearer JWT)"| Sec_Filter
     Crow_Client -->|"HTTP Internal (:8080)"| Crow_Server
     Spot_Svc --> DB_Spots
+    Spot_Sync --> DB_Spots
     Spot_Svc --> DB_Avail
     Book_Svc --> DB_Bookings
     Auth_Ctrl --> DB_Users
@@ -179,6 +192,8 @@ erDiagram
         string gate_pin_code "Poufny kod PIN do bramy"
         text access_instructions "Poufne instrukcje wjazdu"
         boolean is_active "Czy oferta jest aktywna"
+        string sync_status "Stan synchronizacji"
+        bigint sync_revision "Rewizja synchronizacji"
     }
 
     SPOT_AVAILABILITY {

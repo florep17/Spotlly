@@ -92,8 +92,7 @@ public class SpotRequest {
     private BigDecimal hourlyRate;
 
     @JsonProperty("is_active")
-    @Builder.Default
-    @Schema(description = "Whether the spot is active", example = "true")
-    private Boolean isActive = true;
+    @Schema(description = "Whether the spot is active. Defaults to true on creation.", example = "true")
+    private Boolean isActive;
 }
 

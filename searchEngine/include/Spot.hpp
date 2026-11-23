@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -14,6 +15,7 @@ struct Spot {
     std::optional<double> maxHeightMeters;
     bool hasEvCharging;
     bool isActive;
+    std::int64_t revision = 0;
 };
 
 }  // namespace spotly

@@ -1,0 +1,1 @@
+ALTER TABLE parking_spots ADD COLUMN sync_revision BIGINT NOT NULL DEFAULT 1;

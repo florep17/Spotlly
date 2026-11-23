@@ -79,6 +79,10 @@ public class ParkingSpot {
     @Builder.Default
     private String syncStatus = "PENDING";
 
+    @Column(name = "sync_revision", nullable = false)
+    @Builder.Default
+    private long syncRevision = 1;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
