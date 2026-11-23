@@ -1,3 +1,4 @@
+import { ThemeColors, useThemedStyles, useThemeColors } from '../theme/theme';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
@@ -6,14 +7,16 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BackendSpotResponse, BackendSpotRequest } from '../types/spot';
+import { SpotMap } from '../components/SpotMap';
+import { MapPoint } from '../components/SpotMap.types';
 import { spotsService } from '../services/api/spotsService';
 import { getAuthToken } from '../services/api/apiClient';
+import { showMessage, confirmAction } from '../utils/dialogs';
 
 interface AddSpotScreenProps {
   onSuccess?: () => void;
@@ -22,19 +25,23 @@ interface AddSpotScreenProps {
 type ScreenMode = 'my_spots' | 'add_form';
 
 export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
+  const styles = useThemedStyles(createStyles);
+  const colors = useThemeColors();
   const [mode, setMode] = useState<ScreenMode>('my_spots');
 
   // --- List of My Spots state ---
   const [mySpots, setMySpots] = useState<BackendSpotResponse[]>([]);
+  const [spotsError, setSpotsError] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
 
   // --- Add Form state ---
   const [title, setTitle] = useState('');
-  const [street, setStreet] = useState('Pawia 5');
-  const [city, setCity] = useState('Kraków');
-  const [price, setPrice] = useState('8.50');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [price, setPrice] = useState('');
+  const [point, setPoint] = useState<MapPoint | null>(null);
   const [spotType, setSpotType] = useState<'GARAGE' | 'UNDERGROUND' | 'DRIVEWAY' | 'SURFACE'>(
     'GARAGE'
   );
@@ -42,13 +49,14 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
   const [accessType, setAccessType] = useState<'CODE_KEYPAD' | 'BARRIER_PHONE' | 'REMOTE' | 'OPEN'>(
     'CODE_KEYPAD'
   );
-  const [gatePin, setGatePin] = useState('4921');
+  const [gatePin, setGatePin] = useState('');
   const [hasEv, setHasEv] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load spots for the logged-in user
   const fetchSpots = useCallback(async (showLoader = true) => {
     if (showLoader) setIsLoadingSpots(true);
+    setSpotsError(null);
     try {
       if (!getAuthToken()) {
         setMySpots([]);
@@ -56,8 +64,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
       }
       const data = await spotsService.getMySpots();
       setMySpots(data || []);
-    } catch {
-      // In case of error, spots list stays empty
+    } catch (error) {
+      setSpotsError(error instanceof Error ? error.message : 'Nie udało się pobrać miejsc.');
     } finally {
       setIsLoadingSpots(false);
       setIsRefreshing(false);
@@ -75,8 +83,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
       try {
         const data = await spotsService.getMySpots();
         if (isMounted) setMySpots(data || []);
-      } catch {
-        // In case of error, spots list stays empty
+      } catch (error) {
+        if (isMounted) setSpotsError(error instanceof Error ? error.message : 'Nie udało się pobrać miejsc.');
       } finally {
         if (isMounted) setIsLoadingSpots(false);
       }
@@ -93,31 +101,24 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
 
   // Handle Delete Spot
   const handleDeleteSpot = (spot: BackendSpotResponse) => {
-    Alert.alert(
+    confirmAction(
       'Usunięcie miejsca parkingowego',
       `Czy na pewno chcesz usunąć miejsce "${spot.title}" z Twojego konta?`,
-      [
-        { text: 'Anuluj', style: 'cancel' },
-        {
-          text: 'Usuń',
-          style: 'destructive',
-          onPress: async () => {
+      async () => {
             setDeletingSpotId(spot.id);
             try {
               await spotsService.deleteSpot(spot.id);
               setMySpots((prev) => prev.filter((s) => s.id !== spot.id));
-              Alert.alert('Usunięto', 'Miejsce parkingowe zostało usunięte z Twojego konta.');
+              showMessage('Usunięto', 'Miejsce parkingowe zostało usunięte z Twojego konta.');
               await fetchSpots(false);
             } catch (error) {
               const msg =
                 error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania.';
-              Alert.alert('Błąd', msg);
+              showMessage('Błąd', msg);
             } finally {
               setDeletingSpotId(null);
             }
-          },
-        },
-      ]
+          }
     );
   };
 
@@ -125,10 +126,18 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
   const handleCreateSpot = async () => {
     const trimmedTitle =
       title.trim() || `Miejsce ${spotType === 'GARAGE' ? 'Garażowe' : 'Parkingowe'} - ${street}`;
-    const parsedPrice = parseFloat(price.replace(',', '.')) || 8.0;
+    const parsedPrice = Number(price.replace(',', '.'));
 
     if (!street.trim()) {
-      Alert.alert('Błąd', 'Podaj ulicę i numer miejsca parkingowego.');
+      showMessage('Błąd', 'Podaj ulicę i numer miejsca parkingowego.');
+      return;
+    }
+    if (!city.trim() || !Number.isFinite(parsedPrice) || parsedPrice <= 0 || !price.trim()) {
+      showMessage('Błąd', 'Podaj miasto i poprawną cenę za godzinę.');
+      return;
+    }
+    if (!point) {
+      showMessage('Błąd', 'Wskaż miejsce parkingowe na mapie.');
       return;
     }
 
@@ -137,38 +146,34 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
       const payload: BackendSpotRequest = {
         title: trimmedTitle,
         address_street: street.trim(),
-        address_city: city.trim() || 'Kraków',
+        address_city: city.trim(),
         hourly_rate: parsedPrice,
         spot_type: spotType,
         max_vehicle_size: vehicleSize,
         access_type: accessType,
         gate_pin_code: gatePin.trim() || undefined,
         has_ev_charging: hasEv,
-        latitude: 50.0614 + (Math.random() - 0.5) * 0.01,
-        longitude: 19.9383 + (Math.random() - 0.5) * 0.01,
+        latitude: point.latitude,
+        longitude: point.longitude,
         is_active: true,
       };
 
       const createdSpot = await spotsService.createSpot(payload);
       setMySpots((prev) => [createdSpot, ...prev.filter((s) => s.id !== createdSpot.id)]);
 
-      Alert.alert(
+      showMessage(
         'Sukces! 🚀',
         `Miejsce "${trimmedTitle}" zostało dodane i przypisane do Twojego konta.`,
-        [
-          {
-            text: 'Zobacz moje miejsca',
-            onPress: () => {
-              setTitle('');
-              setMode('my_spots');
-              fetchSpots(false);
-            },
-          },
-        ]
+        () => {
+          setTitle(''); setStreet(''); setCity(''); setPrice('');
+          setPoint(null); setGatePin('');
+          setMode('my_spots');
+          fetchSpots(false);
+        }
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Nie udało się dodać miejsca.';
-      Alert.alert('Błąd dodawania', msg);
+      showMessage('Błąd dodawania', msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -202,7 +207,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
         {/* Quick Refresh Icon */}
         {mode === 'my_spots' && (
           <TouchableOpacity onPress={() => fetchSpots(true)} style={styles.refreshButton}>
-            <Feather name="rotate-cw" size={18} color="#1b5e3a" />
+            <Feather name="rotate-cw" size={18} color={colors.accent} />
           </TouchableOpacity>
         )}
       </View>
@@ -220,7 +225,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
           <Feather
             name="list"
             size={16}
-            color={mode === 'my_spots' ? '#1b5e3a' : '#6b7280'}
+            color={mode === 'my_spots' ? colors.accent : colors.muted}
             style={{ marginRight: 6 }}
           />
           <Text style={[styles.tabButtonText, mode === 'my_spots' && styles.tabButtonTextActive]}>
@@ -236,7 +241,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
           <Feather
             name="plus-circle"
             size={16}
-            color={mode === 'add_form' ? '#1b5e3a' : '#6b7280'}
+            color={mode === 'add_form' ? colors.accent : colors.muted}
             style={{ marginRight: 6 }}
           />
           <Text style={[styles.tabButtonText, mode === 'add_form' && styles.tabButtonTextActive]}>
@@ -255,20 +260,25 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor="#1b5e3a"
+              tintColor={colors.accent}
             />
           }
         >
           {isLoadingSpots ? (
             <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#1b5e3a" />
+              <ActivityIndicator size="large" color={colors.accent} />
               <Text style={styles.loadingText}>Pobieranie Twoich miejsc...</Text>
+            </View>
+          ) : spotsError ? (
+            <View style={styles.centerContainer}>
+              <Text style={styles.loadingText}>{spotsError}</Text>
+              <TouchableOpacity onPress={() => fetchSpots(true)}><Text>Spróbuj ponownie</Text></TouchableOpacity>
             </View>
           ) : mySpots.length === 0 ? (
             /* Empty State */
             <View style={styles.emptyCard}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="car-outline" size={44} color="#1b5e3a" />
+                <Ionicons name="car-outline" size={44} color={colors.accent} />
               </View>
               <Text style={styles.emptyTitle}>Brak miejsc na Twoim koncie</Text>
               <Text style={styles.emptyDescription}>
@@ -306,7 +316,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                         <Feather
                           name="map-pin"
                           size={13}
-                          color="#6b7280"
+                          color={colors.muted}
                           style={{ marginRight: 4 }}
                         />
                         <Text style={styles.spotCardAddress}>
@@ -328,14 +338,14 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                       <Ionicons
                         name="pricetag-outline"
                         size={12}
-                        color="#1b5e3a"
+                        color={colors.accent}
                         style={{ marginRight: 4 }}
                       />
                       <Text style={styles.detailBadgeText}>{spot.hourly_rate} PLN / h</Text>
                     </View>
 
                     <View style={styles.detailBadge}>
-                      <Feather name="home" size={12} color="#4b5563" style={{ marginRight: 4 }} />
+                      <Feather name="home" size={12} color={colors.secondary} style={{ marginRight: 4 }} />
                       <Text style={styles.detailBadgeText}>{getSpotTypeLabel(spot.spot_type)}</Text>
                     </View>
 
@@ -344,7 +354,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                         <MaterialCommunityIcons
                           name="ev-station"
                           size={13}
-                          color="#059669"
+                          color={colors.success}
                           style={{ marginRight: 3 }}
                         />
                         <Text style={[styles.detailBadgeText, styles.evText]}>Stacja EV</Text>
@@ -355,7 +365,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                   {/* PIN / Access Info if available */}
                   {spot.gate_pin_code && (
                     <View style={styles.pinRow}>
-                      <Feather name="key" size={12} color="#6b7280" style={{ marginRight: 5 }} />
+                      <Feather name="key" size={12} color={colors.muted} style={{ marginRight: 5 }} />
                       <Text style={styles.pinText}>
                         PIN wjazdu: <Text style={styles.pinCode}>{spot.gate_pin_code}</Text>
                       </Text>
@@ -373,13 +383,13 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                       activeOpacity={0.7}
                     >
                       {deletingSpotId === spot.id ? (
-                        <ActivityIndicator size="small" color="#ef4444" />
+                        <ActivityIndicator size="small" color={colors.danger} />
                       ) : (
                         <>
                           <Feather
                             name="trash-2"
                             size={14}
-                            color="#ef4444"
+                            color={colors.danger}
                             style={{ marginRight: 6 }}
                           />
                           <Text style={styles.deleteButtonText}>Usuń miejsce</Text>
@@ -399,6 +409,8 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
         <ScrollView
           style={styles.flex1}
           contentContainerStyle={styles.formContent}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
           showsVerticalScrollIndicator={false}
         >
           {/* Form Title & Info */}
@@ -406,25 +418,35 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
 
           <Text style={styles.inputLabel}>Tytuł / Nazwa miejsca (opcjonalnie)</Text>
           <View style={styles.inputContainer}>
-            <Feather name="tag" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+            <Feather name="tag" size={16} color={colors.muted} style={{ marginRight: 10 }} />
             <TextInput
               style={styles.textInput}
               value={title}
               onChangeText={setTitle}
               placeholder="np. Garaż podziemny - Pawia"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.placeholder}
             />
           </View>
 
+          <Text style={styles.inputLabel}>Lokalizacja na mapie</Text>
+          <View style={styles.locationMap}>
+            <SpotMap point={point} onPickPoint={setPoint} />
+          </View>
+          <Text accessibilityLiveRegion="polite" style={styles.mapHint}>
+            {point
+              ? 'Pinezka ustawiona. Wskaż inny punkt, aby ją przesunąć.'
+              : 'Dotknij lub kliknij mapę, aby ustawić pinezkę.'}
+          </Text>
+
           <Text style={styles.inputLabel}>Ulica i numer lokalu</Text>
           <View style={styles.inputContainer}>
-            <Feather name="map-pin" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+            <Feather name="map-pin" size={16} color={colors.muted} style={{ marginRight: 10 }} />
             <TextInput
               style={styles.textInput}
               value={street}
               onChangeText={setStreet}
               placeholder="np. Pawia 5"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.placeholder}
             />
           </View>
 
@@ -437,7 +459,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                   value={city}
                   onChangeText={setCity}
                   placeholder="Kraków"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.placeholder}
                 />
               </View>
             </View>
@@ -451,7 +473,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                   onChangeText={setPrice}
                   keyboardType="numeric"
                   placeholder="8.50"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.placeholder}
                 />
               </View>
             </View>
@@ -476,7 +498,7 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
                 activeOpacity={0.8}
               >
                 {spotType === item.key && (
-                  <Feather name="check" size={14} color="#1b5e3a" style={{ marginRight: 4 }} />
+                  <Feather name="check" size={14} color={colors.accent} style={{ marginRight: 4 }} />
                 )}
                 <Text
                   style={[styles.typeGridText, spotType === item.key && styles.typeGridTextActive]}
@@ -551,13 +573,13 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
             <>
               <Text style={styles.inputLabel}>Kod PIN do bramy / kłódki</Text>
               <View style={styles.inputContainer}>
-                <Feather name="lock" size={16} color="#6b7280" style={{ marginRight: 10 }} />
+                <Feather name="lock" size={16} color={colors.muted} style={{ marginRight: 10 }} />
                 <TextInput
                   style={styles.textInput}
                   value={gatePin}
                   onChangeText={setGatePin}
                   placeholder="np. 4921"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.placeholder}
                 />
               </View>
             </>
@@ -602,10 +624,10 @@ export const AddSpotScreen: React.FC<AddSpotScreenProps> = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
   },
   flex1: {
     flex: 1,
@@ -614,9 +636,9 @@ const styles = StyleSheet.create({
     paddingTop: 54,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: colors.subtleBorder,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -624,29 +646,29 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     marginTop: 2,
   },
   refreshButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.accentSurface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabSwitcher: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border,
     gap: 10,
   },
   tabButton: {
@@ -656,20 +678,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
   },
   tabButtonActive: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.accentSurface,
     borderWidth: 1,
-    borderColor: '#1b5e3a',
+    borderColor: colors.accent,
   },
   tabButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#4b5563',
+    color: colors.secondary,
   },
   tabButtonTextActive: {
-    color: '#1b5e3a',
+    color: colors.accent,
   },
   listContent: {
     padding: 16,
@@ -683,22 +705,22 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
   },
   emptyCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     marginTop: 20,
   },
   emptyIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.accentSurface,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -706,19 +728,19 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyDescription: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 20,
   },
   addFirstButton: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -740,7 +762,7 @@ const styles = StyleSheet.create({
   listSectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   miniAddLink: {
     paddingVertical: 4,
@@ -749,15 +771,15 @@ const styles = StyleSheet.create({
   miniAddText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1b5e3a',
+    color: colors.accent,
   },
   spotCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -773,7 +795,7 @@ const styles = StyleSheet.create({
   spotCardTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 4,
   },
   addressRow: {
@@ -782,13 +804,13 @@ const styles = StyleSheet.create({
   },
   spotCardAddress: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     fontWeight: '500',
   },
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.accentSurface,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -804,7 +826,7 @@ const styles = StyleSheet.create({
   activeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#065f46',
+    color: colors.accentText,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -815,7 +837,7 @@ const styles = StyleSheet.create({
   detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -823,13 +845,13 @@ const styles = StyleSheet.create({
   detailBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
   },
   evBadge: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: colors.successSurface,
   },
   evText: {
-    color: '#065f46',
+    color: colors.accentText,
     fontWeight: '700',
   },
   pinRow: {
@@ -840,11 +862,11 @@ const styles = StyleSheet.create({
   },
   pinText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.muted,
   },
   pinCode: {
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -853,16 +875,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.subtleBorder,
   },
   cardOwnerNote: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: colors.placeholder,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.dangerTint,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -870,7 +892,7 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ef4444',
+    color: colors.danger,
   },
   formContent: {
     padding: 20,
@@ -879,32 +901,46 @@ const styles = StyleSheet.create({
   formSectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginTop: 14,
     marginBottom: 10,
   },
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
     marginBottom: 6,
+  },
+  locationMap: {
+    height: 260,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.mapBackground,
+  },
+  mapHint: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 6,
+    marginBottom: 14,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   textInput: {
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
-    color: '#111827',
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',
@@ -922,22 +958,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderRadius: 12,
   },
   typeGridButtonActive: {
-    borderColor: '#1b5e3a',
-    backgroundColor: '#ecfdf5',
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSurface,
   },
   typeGridText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#4b5563',
+    color: colors.secondary,
   },
   typeGridTextActive: {
-    color: '#1b5e3a',
+    color: colors.accent,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -949,23 +985,23 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#d1d5db',
+    borderColor: colors.strongBorder,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   checkboxBoxActive: {
-    backgroundColor: '#1b5e3a',
-    borderColor: '#1b5e3a',
+    backgroundColor: colors.brand,
+    borderColor: colors.accent,
   },
   checkboxLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
   },
   submitButton: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -973,7 +1009,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     marginBottom: 12,
-    shadowColor: '#1b5e3a',
+    shadowColor: colors.brand,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -985,11 +1021,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   buttonDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: colors.disabled,
   },
   disclaimerText: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: colors.placeholder,
     textAlign: 'center',
     lineHeight: 16,
   },

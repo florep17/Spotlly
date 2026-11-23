@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -30,47 +29,10 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
-        Optional<User> existingUserOpt = userRepository.findByEmail(email);
-
-        User user;
-        if (existingUserOpt.isPresent()) {
-            user = existingUserOpt.get();
-            if (user.getPassword() == null) {
-                log.warn("Login failed: User {} registered via external OAuth provider without a password", email);
-                throw new BadCredentialsException("Account was created without a password. Please use OAuth login.");
-            }
-
-            if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                log.warn("Failed login attempt: invalid password for email {}", email);
-                throw new BadCredentialsException("Invalid email or password");
-            }
-
-            if ((user.getNickname() == null || user.getNickname().isBlank()) &&
-                    request.getNickname() != null && !request.getNickname().isBlank()) {
-                user.setNickname(request.getNickname().trim());
-                if (user.getFirstName() == null) {
-                    user.setFirstName(request.getNickname().trim());
-                }
-                user = userRepository.save(user);
-            }
-            log.info("User {} successfully logged in", email);
-        } else {
-            // Auto-create account in DB as requested:
-            // "powinno to tworzyc konto w bazie danych ofc, uzytkownik pola to beda email haslo i nickname"
-            String nickname = resolveNickname(request.getNickname(), email);
-            String userId = generateUserId();
-
-            user = User.builder()
-                    .id(userId)
-                    .email(email)
-                    .nickname(nickname)
-                    .firstName(nickname)
-                    .password(passwordEncoder.encode(request.getPassword()))
-                    .role("USER")
-                    .build();
-
-            user = userRepository.save(user);
-            log.info("Created new user account for {} with id: {}", email, userId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        if (user.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Invalid email or password");
         }
 
         String token = jwtService.generateToken(user);
@@ -125,17 +87,6 @@ public class AuthService {
         return userRepository.findAll().stream()
                 .map(UserDto::fromEntity)
                 .toList();
-    }
-
-    private String resolveNickname(String requestedNickname, String email) {
-        if (requestedNickname != null && !requestedNickname.isBlank()) {
-            return requestedNickname.trim();
-        }
-        int atIndex = email.indexOf('@');
-        if (atIndex > 0) {
-            return email.substring(0, atIndex);
-        }
-        return "user_" + UUID.randomUUID().toString().substring(0, 6);
     }
 
     private String generateUserId() {

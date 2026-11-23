@@ -1,3 +1,4 @@
+import { ThemeColors, useThemedStyles, useThemeColors } from '../theme/theme';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -9,7 +10,7 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { authService } from '../services/api/authService';
 import { ParkingAnimationScene } from '../components/ParkingAnimationScene';
 
@@ -18,6 +19,8 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const styles = useThemedStyles(createStyles);
+  const colors = useThemeColors();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
@@ -31,7 +34,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [entranceAnim] = useState(() => new Animated.Value(0));
   const [slideAnim] = useState(() => new Animated.Value(20));
   const [buttonScale] = useState(() => new Animated.Value(1));
-  const [googleScale] = useState(() => new Animated.Value(1));
   const [logoScale] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
@@ -115,37 +117,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const response =
         authMode === 'register'
           ? await authService.register(trimmedEmail, password, trimmedNick)
-          : await authService.loginWithEmail(trimmedEmail, password, trimmedNick || undefined);
+          : await authService.loginWithEmail(trimmedEmail, password);
 
-      const resolvedNick =
-        response.user.nickname ||
-        response.user.fullName ||
-        trimmedNick ||
-        trimmedEmail.split('@')[0];
-
-      onLoginSuccess(response.user.email, resolvedNick);
+      onLoginSuccess(response.user.email, response.user.nickname || response.user.first_name);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message || 'Błąd uwierzytelniania.');
       } else {
         setErrorMessage('Błąd uwierzytelniania. Spróbuj ponownie.');
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    try {
-      const response = await authService.loginWithGoogle('mock_google_oauth_token');
-      onLoginSuccess(
-        response.user.email,
-        response.user.nickname || response.user.fullName || nickname.trim() || undefined
-      );
-    } catch {
-      setErrorMessage('Logowanie z Google jest obecnie niedostępne.');
     } finally {
       setIsLoading(false);
     }
@@ -240,41 +220,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
           {errorMessage && (
             <View style={styles.errorBox}>
-              <Feather name="alert-circle" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+              <Feather name="alert-circle" size={14} color={colors.danger} style={{ marginRight: 6 }} />
               <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
 
-          {/* Nickname Input (Required on register, optional on login) */}
-          <View
-            style={[
-              styles.inputContainer,
-              focusedField === 'nickname' && styles.inputContainerFocused,
-            ]}
-          >
-            <Feather
-              name="user"
-              size={18}
-              color={focusedField === 'nickname' ? '#1b5e3a' : '#9ca3af'}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.textInput}
-              placeholder={
-                authMode === 'register' ? 'Nick / Nazwa użytkownika *' : 'Nick / Nazwa użytkownika'
-              }
-              placeholderTextColor="#9ca3af"
-              value={nickname}
-              onFocus={() => setFocusedField('nickname')}
-              onBlur={() => setFocusedField(null)}
-              onChangeText={(val) => {
-                setNickname(val);
-                setErrorMessage(null);
-              }}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-          </View>
+          {authMode === 'register' && (
+            <View
+              style={[
+                styles.inputContainer,
+                focusedField === 'nickname' && styles.inputContainerFocused,
+              ]}
+            >
+              <Feather
+                name="user"
+                size={18}
+                color={focusedField === 'nickname' ? colors.accent : colors.placeholder}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Nick / Nazwa użytkownika *"
+                placeholderTextColor={colors.placeholder}
+                value={nickname}
+                onFocus={() => setFocusedField('nickname')}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(val) => {
+                  setNickname(val);
+                  setErrorMessage(null);
+                }}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+          )}
 
           {/* Email Input with Glow on Focus */}
           <View
@@ -286,13 +265,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Feather
               name="mail"
               size={18}
-              color={focusedField === 'email' ? '#1b5e3a' : '#9ca3af'}
+              color={focusedField === 'email' ? colors.accent : colors.placeholder}
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder="Adres e-mail *"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.placeholder}
               value={email}
               onFocus={() => setFocusedField('email')}
               onBlur={() => setFocusedField(null)}
@@ -316,13 +295,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Feather
               name="lock"
               size={18}
-              color={focusedField === 'password' ? '#1b5e3a' : '#9ca3af'}
+              color={focusedField === 'password' ? colors.accent : colors.placeholder}
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder={authMode === 'register' ? 'Hasło (min. 6 znaków) *' : 'Hasło *'}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.placeholder}
               value={password}
               onFocus={() => setFocusedField('password')}
               onBlur={() => setFocusedField(null)}
@@ -338,7 +317,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Feather
                 name={showPassword ? 'eye-off' : 'eye'}
                 size={18}
-                color={focusedField === 'password' ? '#1b5e3a' : '#9ca3af'}
+                color={focusedField === 'password' ? colors.accent : colors.placeholder}
               />
             </Pressable>
           </View>
@@ -377,32 +356,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </Animated.View>
           </Pressable>
 
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>LUB</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Secondary Google Button with Spring Press Animation */}
-          <Pressable
-            onPressIn={() => handlePressInButton(googleScale)}
-            onPressOut={() => handlePressOutButton(googleScale)}
-            onPress={handleGoogleLogin}
-            disabled={isLoading}
-          >
-            <Animated.View style={[styles.googleButton, { transform: [{ scale: googleScale }] }]}>
-              <Ionicons name="logo-google" size={18} color="#db4437" style={{ marginRight: 10 }} />
-              <Text style={styles.googleButtonText}>Kontynuuj z Google</Text>
-            </Animated.View>
-          </Pressable>
         </Animated.View>
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#070b14',
@@ -434,7 +394,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
@@ -459,7 +419,7 @@ const styles = StyleSheet.create({
   formCard: {
     flex: 1,
     minHeight: 510,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 22,
@@ -474,7 +434,7 @@ const styles = StyleSheet.create({
   },
   tabSelector: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.controlSurface,
     borderRadius: 12,
     padding: 3,
     marginBottom: 14,
@@ -486,7 +446,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabItemActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -496,10 +456,10 @@ const styles = StyleSheet.create({
   tabItemText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
+    color: colors.subdued,
   },
   tabItemTextActive: {
-    color: '#1b5e3a',
+    color: colors.accent,
     fontWeight: '800',
   },
   cardHeader: {
@@ -508,28 +468,28 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 3,
     letterSpacing: -0.4,
   },
   instructionText: {
     fontSize: 12.5,
-    color: '#6b7280',
+    color: colors.muted,
     lineHeight: 17,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.errorSurface,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: colors.dangerBorder,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 10,
     marginBottom: 12,
   },
   errorText: {
-    color: '#b91c1c',
+    color: colors.dangerText,
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
@@ -537,9 +497,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
@@ -547,7 +507,7 @@ const styles = StyleSheet.create({
   },
   inputContainerFocused: {
     borderColor: '#10b981',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   inputIcon: {
     marginRight: 10,
@@ -558,20 +518,20 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingVertical: 0,
     fontSize: 14,
-    color: '#111827',
+    color: colors.text,
     fontWeight: '500',
   },
   eyeButton: {
     padding: 6,
   },
   primaryButton: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     borderRadius: 14,
     height: 48,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1b5e3a',
+    shadowColor: colors.brand,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -595,19 +555,19 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border,
   },
   dividerText: {
     marginHorizontal: 12,
-    color: '#9ca3af',
+    color: colors.placeholder,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   googleButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderRadius: 14,
     height: 46,
     flexDirection: 'row',
@@ -620,7 +580,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   googleButtonText: {
-    color: '#374151',
+    color: colors.label,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -631,7 +591,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   demoLinkText: {
-    color: '#059669',
+    color: colors.success,
     fontSize: 12.5,
     fontWeight: '700',
   },

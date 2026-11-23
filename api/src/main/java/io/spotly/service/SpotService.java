@@ -4,9 +4,11 @@ import io.spotly.client.CrowEngineClient;
 import io.spotly.dto.engine.SpotSyncRequest;
 import io.spotly.dto.spot.SpotRequest;
 import io.spotly.dto.spot.SpotResponse;
+import io.spotly.dto.spot.PublicSpotResponse;
 import io.spotly.entity.ParkingSpot;
 import io.spotly.entity.User;
 import io.spotly.repository.ParkingSpotRepository;
+import io.spotly.repository.BookingRepository;
 import io.spotly.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class SpotService {
 
     private final ParkingSpotRepository parkingSpotRepository;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final CrowEngineClient crowEngineClient;
 
@@ -68,8 +71,8 @@ public class SpotService {
                 .isActive(spot.getIsActive())
                 .build();
 
-        crowEngineClient.syncSpot(syncRequest);
-        spot.setSyncStatus("SYNCED_TO_CPP_ENGINE");
+        boolean synced = crowEngineClient.syncSpot(syncRequest);
+        spot.setSyncStatus(synced ? "SYNCED_TO_CPP_ENGINE" : "PENDING");
         spot = parkingSpotRepository.save(spot);
 
         log.info("Created and synced parking spot {} for owner {}", spot.getId(), ownerId);
@@ -119,8 +122,8 @@ public class SpotService {
                 .isActive(spot.getIsActive())
                 .build();
 
-        crowEngineClient.syncSpot(syncRequest);
-        spot.setSyncStatus("SYNCED_TO_CPP_ENGINE");
+        boolean synced = crowEngineClient.syncSpot(syncRequest);
+        spot.setSyncStatus(synced ? "SYNCED_TO_CPP_ENGINE" : "PENDING");
         spot = parkingSpotRepository.save(spot);
 
         log.info("Updated and synced parking spot {} for owner {}", id, ownerId);
@@ -151,29 +154,40 @@ public class SpotService {
 
         crowEngineClient.syncSpot(syncRequest);
 
-        try {
-            parkingSpotRepository.delete(spot);
-            parkingSpotRepository.flush();
-            log.info("Permanently deleted parking spot {}", id);
-        } catch (Exception e) {
-            log.warn("Parking spot {} is referenced (e.g. by bookings); soft-deactivating instead: {}", id, e.getMessage());
+        if (bookingRepository.existsBySpotId(id)) {
             spot.setIsActive(false);
             spot.setSyncStatus("DEACTIVATED");
             parkingSpotRepository.save(spot);
+        } else {
+            parkingSpotRepository.delete(spot);
+            parkingSpotRepository.flush();
+            log.info("Permanently deleted parking spot {}", id);
         }
     }
 
     @Transactional(readOnly = true)
-    public SpotResponse getSpotById(UUID id) {
+    public PublicSpotResponse getSpotById(UUID id) {
         ParkingSpot spot = parkingSpotRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parking spot with ID " + id + " not found"));
-        return SpotResponse.fromEntity(spot);
+        if (!Boolean.TRUE.equals(spot.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parking spot not found");
+        }
+        return PublicSpotResponse.fromEntity(spot);
     }
 
     @Transactional(readOnly = true)
     public List<SpotResponse> getMySpots(String ownerId) {
         return parkingSpotRepository.findByOwnerId(ownerId).stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsActive()))
                 .map(SpotResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublicSpotResponse> getAllActiveSpots() {
+        return parkingSpotRepository.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsActive()))
+                .map(PublicSpotResponse::fromEntity)
                 .toList();
     }
 }

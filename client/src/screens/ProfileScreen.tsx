@@ -1,16 +1,19 @@
+import { ThemeColors, useThemedStyles, useThemeColors } from '../theme/theme';
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 
 interface ProfileScreenProps {
   userEmail?: string;
   onLogout?: () => void;
+  onOpenSettings: () => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogout }) => {
-  const displayEmail = userEmail || 'uzytkownik@spotly.io';
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Użytkownik';
-  const initials = displayName.slice(0, 2).toUpperCase();
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogout, onOpenSettings }) => {
+  const styles = useThemedStyles(createStyles);
+  const colors = useThemeColors();
+  const displayEmail = userEmail || '';
+  const initials = displayEmail.slice(0, 2).toUpperCase() || 'U';
 
   return (
     <View style={styles.container}>
@@ -18,7 +21,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogou
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.userName}>{displayName}</Text>
         <Text style={styles.userEmail}>{displayEmail}</Text>
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Kierowca & Gospodarz</Text>
@@ -26,60 +28,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogou
       </View>
 
       <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>Uwierzytelnianie i Bezpieczeństwo</Text>
+        <Text style={styles.sectionTitle}>Konto</Text>
 
-        <View style={styles.menuItem}>
-          <Ionicons name="logo-apple" size={20} color="#111827" style={styles.menuIcon} />
-          <View style={styles.menuTextContainer}>
-            <Text style={styles.menuTitle}>Apple Sign-In</Text>
-            <Text style={styles.menuSub}>Połączono z kontem Apple ID</Text>
-          </View>
-          <Text style={styles.connectedBadge}>Połączono</Text>
-        </View>
-
-        <View style={styles.menuItem}>
-          <Ionicons name="logo-google" size={19} color="#db4437" style={styles.menuIcon} />
-          <View style={styles.menuTextContainer}>
-            <Text style={styles.menuTitle}>Google Sign-In</Text>
-            <Text style={styles.menuSub}>Połączone z adresem Gmail</Text>
-          </View>
-          <Text style={styles.connectedBadge}>Połączono</Text>
-        </View>
-      </View>
-
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>Ustawienia aplikacji</Text>
-
-        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-          <Feather name="credit-card" size={19} color="#4b5563" style={styles.menuIcon} />
-          <View style={styles.menuTextContainer}>
-            <Text style={styles.menuTitle}>Metody płatności</Text>
-            <Text style={styles.menuSub}>Karty testowe, BLIK</Text>
-          </View>
-          <Feather name="chevron-right" size={18} color="#9ca3af" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-          <Feather name="bell" size={19} color="#4b5563" style={styles.menuIcon} />
-          <View style={styles.menuTextContainer}>
-            <Text style={styles.menuTitle}>Powiadomienia i opóźnienia</Text>
-            <Text style={styles.menuSub}>Alerty o końcu czasu parkowania</Text>
-          </View>
-          <Feather name="chevron-right" size={18} color="#9ca3af" />
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.menuItem}
+          onPress={onOpenSettings}
+          activeOpacity={0.7}
+        >
+          <Feather name="settings" size={19} color={colors.accent} style={styles.menuIcon} />
+          <Text style={[styles.menuTitle, styles.menuTextContainer]}>Ustawienia</Text>
+          <Feather name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
 
         {onLogout && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Wyloguj się"
             style={[styles.menuItem, styles.logoutItem]}
             onPress={onLogout}
             activeOpacity={0.7}
           >
-            <Feather name="log-out" size={19} color="#ef4444" style={styles.menuIcon} />
+            <Feather name="log-out" size={19} color={colors.danger} style={styles.menuIcon} />
             <View style={styles.menuTextContainer}>
               <Text style={[styles.menuTitle, styles.logoutText]}>Wyloguj się</Text>
               <Text style={styles.menuSub}>Zakończ bieżącą sesję</Text>
             </View>
-            <Feather name="chevron-right" size={18} color="#ef4444" />
+            <Feather name="chevron-right" size={18} color={colors.danger} />
           </TouchableOpacity>
         )}
       </View>
@@ -87,24 +62,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ userEmail, onLogou
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
   },
   header: {
     paddingTop: 60,
     paddingBottom: 24,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: colors.subtleBorder,
   },
   avatar: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -114,18 +89,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
   },
-  userName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-  },
   userEmail: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     marginTop: 2,
   },
   roleBadge: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.accentSurface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -134,7 +104,7 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#065f46',
+    color: colors.accentText,
   },
   menuSection: {
     marginTop: 18,
@@ -143,7 +113,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#6b7280',
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -152,20 +122,20 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     padding: 14,
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
   logoutItem: {
     marginTop: 8,
-    borderColor: '#fee2e2',
-    backgroundColor: '#fff5f5',
+    borderColor: colors.dangerTint,
+    backgroundColor: colors.dangerSurface,
   },
   logoutText: {
-    color: '#ef4444',
+    color: colors.danger,
   },
   menuIcon: {
     marginRight: 12,
@@ -178,16 +148,16 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   menuSub: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.muted,
     marginTop: 2,
   },
   connectedBadge: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#059669',
+    color: colors.success,
   },
 });

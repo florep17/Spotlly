@@ -1,20 +1,25 @@
+import { ThemeColors, useThemedStyles } from '../theme/theme';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import { Booking } from '../types/booking';
 import { bookingsService } from '../services/api/bookingsService';
+import { showMessage } from '../utils/dialogs';
 
 export const ReservationsScreen: React.FC = () => {
+  const styles = useThemedStyles(createStyles);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    bookingsService.getUserBookings().then(setBookings);
+    bookingsService.getUserBookings().then(setBookings).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Nie udało się pobrać rezerwacji.');
+    });
   }, []);
 
   const handleShowAccessCode = (booking: Booking) => {
-    Alert.alert(
+    showMessage(
       'Instrukcja wjazdu 🔑',
-      `${booking.accessCode || 'Kod: 4821#'}\n\nWjedź w bramę po lewej stronie, pilot do szlabanu w skrytce. Numer stanowiska: 14.`,
-      [{ text: 'Rozumiem' }]
+      booking.accessCode || 'Instrukcja będzie dostępna 15 minut przed rozpoczęciem rezerwacji.'
     );
   };
 
@@ -26,6 +31,7 @@ export const ReservationsScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
+        {error && <Text style={styles.emptySub}>{error}</Text>}
         {bookings.map((booking) => (
           <View key={booking.id} style={styles.bookingCard}>
             <View style={styles.cardHeader}>
@@ -40,11 +46,13 @@ export const ReservationsScreen: React.FC = () => {
             <View style={styles.timeInfoRow}>
               <View style={styles.timeInfoBlock}>
                 <Text style={styles.timeLabel}>Data i godziny:</Text>
-                <Text style={styles.timeValue}>Dziś, 10:00 – 13:00 (3h)</Text>
+                <Text style={styles.timeValue}>
+                  {new Date(booking.startDateTime).toLocaleString('pl-PL')} – {new Date(booking.endDateTime).toLocaleString('pl-PL')}
+                </Text>
               </View>
 
               <View style={styles.priceBlock}>
-                <Text style={styles.priceLabel}>Opłacono:</Text>
+                <Text style={styles.priceLabel}>Koszt:</Text>
                 <Text style={styles.priceValue}>{booking.totalPrice.toFixed(2)} PLN</Text>
               </View>
             </View>
@@ -58,7 +66,7 @@ export const ReservationsScreen: React.FC = () => {
           </View>
         ))}
 
-        {bookings.length === 0 && (
+        {bookings.length === 0 && !error && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🚗</Text>
             <Text style={styles.emptyTitle}>Brak aktywnych rezerwacji</Text>
@@ -70,36 +78,36 @@ export const ReservationsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   header: {
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: colors.subtleBorder,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   headerSub: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     marginTop: 2,
   },
   list: {
     padding: 16,
   },
   bookingCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 14,
     elevation: 2,
@@ -117,10 +125,10 @@ const styles = StyleSheet.create({
   spotTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   statusBadge: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: colors.successSurface,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -128,17 +136,17 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#065f46',
+    color: colors.accentText,
   },
   address: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     marginBottom: 12,
   },
   timeInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background,
     padding: 10,
     borderRadius: 10,
     marginBottom: 14,
@@ -148,12 +156,12 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: colors.muted,
   },
   timeValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
     marginTop: 2,
   },
   priceBlock: {
@@ -161,16 +169,16 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: colors.muted,
   },
   priceValue: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#1b5e3a',
+    color: colors.accent,
     marginTop: 2,
   },
   accessButton: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.successPanel,
     borderWidth: 1.5,
     borderColor: '#10b981',
     borderRadius: 12,
@@ -180,7 +188,7 @@ const styles = StyleSheet.create({
   accessButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#065f46',
+    color: colors.accentText,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -193,12 +201,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 4,
   },
   emptySub: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.muted,
     textAlign: 'center',
   },
 });

@@ -14,17 +14,14 @@ export interface LoginResponse {
  */
 export const authService = {
   /**
-   * Logowanie za pomocą adresu email, hasła oraz opcjonalnego nicku
+   * Logowanie za pomocą adresu email i hasła
    */
-  async loginWithEmail(
-    email: string,
-    password?: string,
-    nickname?: string
-  ): Promise<LoginResponse> {
+  async loginWithEmail(email: string, password: string): Promise<LoginResponse> {
     try {
       const res = await request<LoginResponse>('/auth/login', {
+        includeSession: false,
         method: 'POST',
-        body: JSON.stringify({ email, password, nickname }),
+        body: JSON.stringify({ email, password }),
       });
       if (res?.access_token) {
         setAuthToken(res.access_token);
@@ -46,6 +43,7 @@ export const authService = {
   async register(email: string, password: string, nickname: string): Promise<LoginResponse> {
     try {
       const res = await request<LoginResponse>('/auth/register', {
+        includeSession: false,
         method: 'POST',
         body: JSON.stringify({ email, password, nickname }),
       });
@@ -85,25 +83,11 @@ export const authService = {
   /**
    * Logowanie przez Google (OAuth2 ID Token)
    */
-  async loginWithGoogle(idToken: string = 'mock_google_oauth_token'): Promise<LoginResponse> {
-    try {
-      return await request<LoginResponse>('/auth/oauth/google', {
-        method: 'POST',
-        body: JSON.stringify({ id_token: idToken }),
-      });
-    } catch {
-      return {
-        access_token: 'spotly_google_mock_token',
-        token_type: 'Bearer',
-        expires_in_seconds: 86400,
-        user: {
-          id: 'u-google-001',
-          email: 'google.user@spotly.io',
-          fullName: 'Google User',
-          role: 'DRIVER',
-          createdAt: new Date().toISOString(),
-        },
-      };
-    }
+  async loginWithGoogle(idToken: string): Promise<LoginResponse> {
+    return await request<LoginResponse>('/auth/oauth/google', {
+      includeSession: false,
+      method: 'POST',
+      body: JSON.stringify({ id_token: idToken }),
+    });
   },
 };

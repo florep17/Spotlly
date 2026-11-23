@@ -25,7 +25,7 @@ public class LoginRequest {
     @Schema(description = "User password (minimum 6 characters)", example = "secretPass123", requiredMode = Schema.RequiredMode.REQUIRED)
     private String password;
 
-    @Schema(description = "User nickname (optional on login; will be used if account is newly created)", example = "SpotlyDriver")
+    @Schema(description = "User nickname (optional)", example = "SpotlyDriver")
     private String nickname;
 }
 

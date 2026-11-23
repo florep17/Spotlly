@@ -1,9 +1,9 @@
-export type UserRole = 'DRIVER' | 'OWNER' | 'BOTH';
+export type UserRole = 'USER';
 
 export interface User {
   id: string;
   email: string;
-  fullName: string;
+  first_name?: string;
   nickname?: string;
   avatarUrl?: string;
   role: UserRole;

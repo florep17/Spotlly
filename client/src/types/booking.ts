@@ -10,7 +10,6 @@ export interface Booking {
   endDateTime: string;
   durationHours: number;
   hourlyRate: number;
-  serviceFee: number;
   totalPrice: number;
   status: BookingStatus;
   accessCode?: string;
@@ -21,5 +20,5 @@ export interface CreateBookingRequest {
   spotId: string;
   startDateTime: string;
   endDateTime: string;
-  paymentMethod: 'TEST_CARD' | 'BLIK' | 'APPLE_PAY';
+  vehiclePlateNumber: string;
 }

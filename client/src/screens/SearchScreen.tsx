@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { ThemeColors, useThemedStyles, useThemeColors } from '../theme/theme';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,21 +7,56 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { ParkingSpot } from '../types/spot';
-import { MOCK_SPOTS } from '../services/api/spotsService';
+import { SpotMap } from '../components/SpotMap';
+import { BackendSpotResponse } from '../types/spot';
+import { spotsService } from '../services/api/spotsService';
 
 interface SearchScreenProps {
-  onSelectSpot: (spot: ParkingSpot) => void;
+  onSelectSpot?: (spot: BackendSpotResponse) => void;
 }
 
-const garageThumb = require('../../assets/garage_thumb.png');
-const mapKazimierz = require('../../assets/map_kazimierz.png');
-
 export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
-  const [selectedSpot, setSelectedSpot] = useState<ParkingSpot>(MOCK_SPOTS[0]);
+  const styles = useThemedStyles(createStyles);
+  const colors = useThemeColors();
+  const [spots, setSpots] = useState<BackendSpotResponse[]>([]);
+  const [selectedSpot, setSelectedSpot] = useState<BackendSpotResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [recenterKey, setRecenterKey] = useState(0);
+  const [query, setQuery] = useState('');
+  const [showList, setShowList] = useState(false);
+  const visibleSpots = spots.filter((spot) =>
+    `${spot.title} ${spot.address_street} ${spot.address_city}`.toLocaleLowerCase('pl-PL')
+      .includes(query.trim().toLocaleLowerCase('pl-PL')));
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await spotsService.getAllSpots();
+        if (mounted) {
+          setSpots(data || []);
+          if (data && data.length > 0) setSelectedSpot(data[0]);
+        }
+      } catch (e: unknown) {
+        if (mounted) {
+          setError(e instanceof Error ? e.message : 'Błąd ładowania miejsc parkingowych.');
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleMarkerPress = (spot: BackendSpotResponse) => {
+    setSelectedSpot(spot);
+  };
 
   return (
     <View style={styles.container}>
@@ -33,172 +69,134 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
             </View>
             <Text style={styles.brandTitle}>Spotlly</Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>JL</Text>
-          </View>
         </View>
 
         <Text style={styles.tagline}>Miejsce na Twój dzień.</Text>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#4b5563" style={styles.searchIcon} />
+          <Feather name="search" size={18} color={colors.secondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Kazimierz, Kraków"
-            placeholderTextColor="#111827"
-            defaultValue="Kazimierz, Kraków"
+            placeholder="Szukaj miejsca..."
+            placeholderTextColor={colors.placeholder}
+            value={query}
+            onChangeText={(value) => {
+              setQuery(value);
+              setSelectedSpot(null);
+            }}
           />
-          <TouchableOpacity style={styles.filterIconButton} activeOpacity={0.7}>
-            <Feather name="sliders" size={18} color="#374151" />
-          </TouchableOpacity>
         </View>
-
-        {/* Filter Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsRow}>
-          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
-            <Feather name="calendar" size={13} color="#374151" style={styles.chipIcon} />
-            <Text style={styles.chipText}>12 paź</Text>
-            <Feather name="chevron-down" size={14} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
-            <Feather name="clock" size={13} color="#374151" style={styles.chipIcon} />
-            <Text style={styles.chipText}>10:00–13:00</Text>
-            <Feather name="chevron-down" size={14} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip} activeOpacity={0.7}>
-            <Text style={styles.chipText}>Poniżej 10 zł</Text>
-            <Feather name="chevron-down" size={14} color="#6b7280" />
-          </TouchableOpacity>
-        </ScrollView>
       </View>
 
       {/* Map View Container */}
       <View style={styles.mapContainer}>
-        {/* Authentic Kazimierz Map Background */}
-        <Image source={mapKazimierz} style={styles.mapBackground} resizeMode="cover" />
+        {isLoading ? (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.loadingText}>Ładowanie mapy...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.loadingOverlay}>
+            <Feather name="wifi-off" size={32} color={colors.placeholder} />
+            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorSub}>Sprawdź połączenie z serwerem API</Text>
+          </View>
+        ) : (
+          <SpotMap spots={visibleSpots} selectedSpot={selectedSpot} onSelectSpot={handleMarkerPress} recenterKey={recenterKey} />
+        )}
 
-        {/* Interactive Floating Price Pins */}
-        <TouchableOpacity
-          style={[styles.pricePin, styles.activePin, { top: 180, left: 165 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.activePinText}>5 zł</Text>
-        </TouchableOpacity>
+        {/* Overlay badges */}
+        {!isLoading && !error && (
+          <>
+            <View style={styles.nearbyPill}>
+              <Text style={styles.nearbyPillText}>{visibleSpots.length} miejsc</Text>
+            </View>
 
-        <TouchableOpacity
-          style={[styles.pricePin, { top: 78, left: 245 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.pricePinText}>8 zł</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.toggleListPill} activeOpacity={0.8} onPress={() => setShowList((value) => !value)}>
+              <Feather name="list" size={14} color={colors.text} style={{ marginRight: 6 }} />
+              <Text style={styles.toggleListText}>{showList ? 'Mapa' : 'Lista'}</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.pricePin, { top: 135, left: 45 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.pricePinText}>4 zł</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.recenterButton}
+              activeOpacity={0.85}
+              onPress={() => setRecenterKey((key) => key + 1)}
+            >
+              <MaterialCommunityIcons name="crosshairs-gps" size={24} color={colors.mapControl} />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.pricePin, { top: 295, left: 75 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[2])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.pricePinText}>3 zł</Text>
-        </TouchableOpacity>
+          </>
+        )}
 
-        <TouchableOpacity
-          style={[styles.pricePin, { top: 290, left: 285 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[0])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.pricePinText}>6 zł</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.pricePin, { top: 375, left: 228 }]}
-          onPress={() => setSelectedSpot(MOCK_SPOTS[1])}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.pricePinText}>7 zł</Text>
-        </TouchableOpacity>
-
-        {/* Top Badges */}
-        <View style={styles.nearbyPill}>
-          <Text style={styles.nearbyPillText}>12 miejsc w pobliżu</Text>
-        </View>
-
-        <TouchableOpacity style={styles.toggleListPill} activeOpacity={0.8}>
-          <Feather name="list" size={14} color="#111827" style={{ marginRight: 6 }} />
-          <Text style={styles.toggleListText}>Lista</Text>
-        </TouchableOpacity>
-
-        {/* Location Crosshair Button */}
-        <TouchableOpacity style={styles.recenterButton} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#1e4620" />
-        </TouchableOpacity>
-
-        <Text style={styles.osmAttribution}>© OpenStreetMap</Text>
-
-        {/* Bottom Preview Spot Card */}
-        {selectedSpot && (
+        {/* Bottom Preview Card */}
+        {showList && !isLoading && !error && (
+          <ScrollView style={{ position: 'absolute', top: 58, right: 12, left: 12, bottom: 10, backgroundColor: 'white', borderRadius: 18, padding: 12 }}>
+            {visibleSpots.map((spot) => <TouchableOpacity key={spot.id} onPress={() => { setSelectedSpot(spot); setShowList(false); }} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={styles.spotTitle}>{spot.title}</Text>
+              <Text style={styles.spotAddress}>{spot.address_street}, {spot.address_city} · {Number(spot.hourly_rate).toFixed(2)} zł / godz.</Text>
+            </TouchableOpacity>)}
+            {visibleSpots.length === 0 && <Text>Brak miejsc dla tego wyszukiwania.</Text>}
+          </ScrollView>
+        )}
+        {selectedSpot && !showList && !isLoading && !error && visibleSpots.some((spot) => spot.id === selectedSpot.id) && (
           <View style={styles.previewCard}>
             <View style={styles.previewCardContent}>
-              <Image source={garageThumb} style={styles.spotThumb} />
+              <View style={styles.spotThumbPlaceholder}>
+                <Feather name="map-pin" size={28} color={colors.accent} />
+              </View>
               <View style={styles.spotInfo}>
                 <View style={styles.ratingRow}>
-                  <Ionicons
-                    name="star-outline"
-                    size={14}
-                    color="#1b5e3a"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.starText}>
-                    4,9 <Text style={styles.reviewCount}>(32)</Text>
-                  </Text>
+                  <Ionicons name="star" size={13} color="#f59e0b" style={{ marginRight: 4 }} />
+                  <Text style={styles.starText}>Nowe</Text>
                   <Text style={styles.walkingDot}> · </Text>
-                  <Text style={styles.walkingText}>3 min pieszo</Text>
+                  <Text style={styles.walkingText}>{selectedSpot.address_city}</Text>
                 </View>
 
-                <Text style={styles.spotTitle}>{selectedSpot.title}</Text>
-                <Text style={styles.spotAddress}>
-                  {selectedSpot.address} · {selectedSpot.isCovered ? 'Zadaszone' : 'Odkryte'}
+                <Text style={styles.spotTitle} numberOfLines={1}>
+                  {selectedSpot.title}
+                </Text>
+                <Text style={styles.spotAddress} numberOfLines={1}>
+                  {selectedSpot.address_street} ·{' '}
+                  {selectedSpot.spot_type === 'GARAGE'
+                    ? 'Zadaszone'
+                    : selectedSpot.spot_type === 'UNDERGROUND'
+                      ? 'Podziemne'
+                      : 'Odkryte'}
                 </Text>
 
                 <View style={styles.priceActionRow}>
                   <View style={styles.priceRow}>
-                    <Text style={styles.priceMain}>{selectedSpot.hourlyPrice.toFixed(0)} zł</Text>
+                    <Text style={styles.priceMain}>
+                      {Number(selectedSpot.hourly_rate).toFixed(0)} zł
+                    </Text>
                     <Text style={styles.priceUnit}> / godz.</Text>
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.detailsButton}
-                    onPress={() => onSelectSpot(selectedSpot)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.detailsButtonText}>Zobacz miejsce</Text>
-                    <Feather
-                      name="arrow-right"
-                      size={15}
-                      color="#1b5e3a"
-                      style={{ marginLeft: 4 }}
-                    />
-                  </TouchableOpacity>
+                  {onSelectSpot && (
+                    <TouchableOpacity
+                      style={styles.detailsButton}
+                      onPress={() => onSelectSpot(selectedSpot)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.detailsButtonText}>Zobacz miejsce</Text>
+                      <Feather
+                        name="arrow-right"
+                        size={15}
+                        color={colors.accent}
+                        style={{ marginLeft: 4 }}
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
 
             <View style={styles.previewCardFooter}>
               <View style={styles.availabilityStatus}>
-                <View style={styles.greenDot} />
+                <View style={[styles.greenDot, { backgroundColor: selectedSpot.is_active ? '#10b981' : colors.placeholder }]} />
                 <Text style={styles.availabilityText}>
-                  Dostępne dziś, {selectedSpot.availableFrom}–{selectedSpot.availableTo}
+                  Aktywne ogłoszenie · {selectedSpot.spot_type}
                 </Text>
               </View>
             </View>
@@ -209,16 +207,16 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectSpot }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   header: {
     paddingTop: 54,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   logoRow: {
     flexDirection: 'row',
@@ -234,7 +232,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -247,36 +245,23 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     letterSpacing: -0.5,
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#e6f3eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#1b5e3a',
-    fontWeight: '700',
-    fontSize: 14,
   },
   tagline: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 16,
     letterSpacing: -0.6,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 28,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 12,
@@ -288,7 +273,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
   },
   filterIconButton: {
     padding: 4,
@@ -299,7 +284,7 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -311,25 +296,43 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1f2937',
+    color: colors.heading,
     marginRight: 4,
   },
   mapContainer: {
     flex: 1,
-    backgroundColor: '#e5eae8',
+    backgroundColor: colors.mapBackground,
     position: 'relative',
     overflow: 'hidden',
   },
-  mapBackground: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
+  map: {
+    flex: 1,
+  },
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.muted,
+    fontWeight: '500',
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.dangerText,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  errorSub: {
+    fontSize: 12,
+    color: colors.placeholder,
+    textAlign: 'center',
   },
   pricePin: {
-    position: 'absolute',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 18,
@@ -342,10 +345,10 @@ const styles = StyleSheet.create({
   pricePinText: {
     fontWeight: '700',
     fontSize: 14,
-    color: '#1b5e3a',
+    color: colors.accent,
   },
   activePin: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     transform: [{ scale: 1.1 }],
     elevation: 6,
     shadowOpacity: 0.25,
@@ -359,7 +362,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     left: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
@@ -372,13 +375,13 @@ const styles = StyleSheet.create({
   nearbyPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
   },
   toggleListPill: {
     position: 'absolute',
     top: 14,
     right: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 18,
@@ -393,7 +396,7 @@ const styles = StyleSheet.create({
   toggleListText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   recenterButton: {
     position: 'absolute',
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -416,14 +419,14 @@ const styles = StyleSheet.create({
     bottom: 162,
     left: 14,
     fontSize: 9,
-    color: '#6b7280',
+    color: colors.muted,
   },
   previewCard: {
     position: 'absolute',
     bottom: 10,
     left: 12,
     right: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 22,
     padding: 14,
     elevation: 8,
@@ -435,11 +438,14 @@ const styles = StyleSheet.create({
   previewCardContent: {
     flexDirection: 'row',
   },
-  spotThumb: {
-    width: 96,
-    height: 96,
+  spotThumbPlaceholder: {
+    width: 72,
+    height: 72,
     borderRadius: 14,
     marginRight: 14,
+    backgroundColor: colors.accentSurface,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   spotInfo: {
     flex: 1,
@@ -453,29 +459,25 @@ const styles = StyleSheet.create({
   starText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
-  },
-  reviewCount: {
-    color: '#6b7280',
-    fontWeight: '400',
+    color: colors.text,
   },
   walkingDot: {
-    color: '#9ca3af',
+    color: colors.placeholder,
   },
   walkingText: {
     fontSize: 12,
-    color: '#4b5563',
+    color: colors.secondary,
   },
   spotTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 2,
     letterSpacing: -0.3,
   },
   spotAddress: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.muted,
     marginBottom: 6,
   },
   priceActionRow: {
@@ -490,11 +492,11 @@ const styles = StyleSheet.create({
   priceMain: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   priceUnit: {
     fontSize: 13,
-    color: '#4b5563',
+    color: colors.secondary,
   },
   detailsButton: {
     flexDirection: 'row',
@@ -504,13 +506,13 @@ const styles = StyleSheet.create({
   detailsButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1b5e3a',
+    color: colors.accent,
   },
   previewCardFooter: {
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.subtleBorder,
   },
   availabilityStatus: {
     flexDirection: 'row',
@@ -525,7 +527,7 @@ const styles = StyleSheet.create({
   },
   availabilityText: {
     fontSize: 12,
-    color: '#374151',
+    color: colors.label,
     fontWeight: '500',
   },
 });

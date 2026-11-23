@@ -1,8 +1,10 @@
+import { ThemeColors, useThemedStyles, useThemeColors } from '../theme/theme';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ParkingSpot } from '../types/spot';
 import { bookingsService } from '../services/api/bookingsService';
+import { showMessage } from '../utils/dialogs';
 
 interface BookingScreenProps {
   spot: ParkingSpot;
@@ -10,39 +12,46 @@ interface BookingScreenProps {
   onBookingSuccess: () => void;
 }
 
-const garageHero = require('../../assets/garage_hero.png');
-const annaAvatar = require('../../assets/anna_avatar.png');
-
 export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBookingSuccess }) => {
-  const [selectedDay, setSelectedDay] = useState(12);
+  const styles = useThemedStyles(createStyles);
+  const colors = useThemeColors();
+  const firstDate = new Date();
+  if (firstDate.getHours() >= 10) firstDate.setDate(firstDate.getDate() + 1);
+  const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const [selectedDay, setSelectedDay] = useState(() => dateKey(firstDate));
+  const [vehiclePlateNumber, setVehiclePlateNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const days = [
-    { day: 'Pon', date: 12 },
-    { day: 'Wt', date: 13 },
-    { day: 'Śr', date: 14 },
-    { day: 'Czw', date: 15 },
-    { day: 'Pt', date: 16 },
-    { day: 'Sob', date: 17 },
-    { day: 'Ndz', date: 18 },
-  ];
+  const days = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(firstDate);
+    date.setDate(date.getDate() + offset);
+    return {
+      key: dateKey(date),
+      day: new Intl.DateTimeFormat('pl-PL', { weekday: 'short' }).format(date),
+      date: date.getDate(),
+    };
+  });
 
   const handleBooking = async () => {
+    if (!vehiclePlateNumber.trim()) {
+      showMessage('Uzupełnij dane', 'Podaj numer rejestracyjny pojazdu.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       await bookingsService.createBooking({
         spotId: spot.id,
-        startDateTime: `2026-10-${selectedDay}T10:00:00Z`,
-        endDateTime: `2026-10-${selectedDay}T13:00:00Z`,
-        paymentMethod: 'TEST_CARD',
+        startDateTime: new Date(`${selectedDay}T10:00:00`).toISOString(),
+        endDateTime: new Date(`${selectedDay}T13:00:00`).toISOString(),
+        vehiclePlateNumber: vehiclePlateNumber.trim(),
       });
-      Alert.alert(
+      showMessage(
         'Rezerwacja potwierdzona! 🎉',
-        'Miejsce zostało zarezerwowane. Instrukcję wjazdu i kod PIN znajdziesz w zakładce Rezerwacje.',
-        [{ text: 'Przejdź do rezerwacji', onPress: onBookingSuccess }]
+        'Miejsce zostało zarezerwowane. Szczegóły znajdziesz w zakładce Rezerwacje.',
+        onBookingSuccess
       );
-    } catch {
-      Alert.alert('Błąd', 'Nie udało się dokonać rezerwacji. Spróbuj ponownie.');
+    } catch (error) {
+      showMessage('Błąd', error instanceof Error ? error.message : 'Nie udało się dokonać rezerwacji.');
     } finally {
       setIsSubmitting(false);
     }
@@ -53,100 +62,50 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
       {/* Top Header Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.7}>
-          <Feather name="arrow-left" size={20} color="#111827" style={{ marginRight: 6 }} />
+          <Feather name="arrow-left" size={20} color={colors.text} style={{ marginRight: 6 }} />
           <Text style={styles.backText}>Wróć do mapy</Text>
         </TouchableOpacity>
 
-        <View style={styles.topActions}>
-          <TouchableOpacity style={styles.iconAction} activeOpacity={0.7}>
-            <Feather name="share-2" size={19} color="#111827" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconAction} activeOpacity={0.7}>
-            <Feather name="heart" size={19} color="#111827" />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Hero Image with Camera Counter */}
+        {/* Listing placeholder until hosts can upload photos */}
         <View style={styles.heroContainer}>
-          <Image source={garageHero} style={styles.heroImage} resizeMode="cover" />
-          <View style={styles.photoCounter}>
-            <Feather name="camera" size={12} color="#ffffff" style={{ marginRight: 5 }} />
-            <Text style={styles.photoCounterText}>1 / 3</Text>
-          </View>
+          <Feather name="map-pin" size={48} color={colors.accent} />
         </View>
 
         {/* Main Details */}
         <View style={styles.detailsContent}>
           <View style={styles.badgeRow}>
             <Text style={styles.typeBadge}>PRYWATNY PARKING</Text>
-            <View style={styles.ratingBox}>
-              <Ionicons name="star" size={14} color="#1b5e3a" style={{ marginRight: 4 }} />
-              <Text style={styles.ratingText}>4,9 (32 opinie)</Text>
-            </View>
           </View>
 
-          <Text style={styles.title}>Garaż na Kazimierzu</Text>
+          <Text style={styles.title}>{spot.title}</Text>
           <View style={styles.addressRow}>
-            <Ionicons name="location-sharp" size={14} color="#6b7280" style={{ marginRight: 4 }} />
-            <Text style={styles.address}>Dajwór 12, Kraków · 3 min pieszo</Text>
+            <Ionicons name="location-sharp" size={14} color={colors.muted} style={{ marginRight: 4 }} />
+            <Text style={styles.address}>{spot.address}, {spot.city}</Text>
           </View>
 
           {/* Feature Pills */}
           <View style={styles.featuresRow}>
-            <View style={styles.featurePill}>
-              <Feather name="home" size={13} color="#1b5e3a" style={{ marginRight: 5 }} />
+            {spot.isCovered && <View style={styles.featurePill}>
+              <Feather name="home" size={13} color={colors.accent} style={{ marginRight: 5 }} />
               <Text style={styles.featurePillText}>Zadaszone</Text>
-            </View>
-            <View style={styles.featurePill}>
-              <Feather name="shield" size={13} color="#1b5e3a" style={{ marginRight: 5 }} />
-              <Text style={styles.featurePillText}>Bezpieczne</Text>
-            </View>
-            <View style={styles.featurePill}>
-              <Ionicons name="car-outline" size={14} color="#1b5e3a" style={{ marginRight: 5 }} />
+            </View>}
+            {spot.fitsSuv && <View style={styles.featurePill}>
+              <Ionicons name="car-outline" size={14} color={colors.accent} style={{ marginRight: 5 }} />
               <Text style={styles.featurePillText}>Mieści SUV-a</Text>
-            </View>
+            </View>}
           </View>
-
-          {/* Host Card with Photo */}
-          <View style={styles.hostCard}>
-            <Image source={annaAvatar} style={styles.hostAvatarImage} />
-            <View style={styles.hostInfo}>
-              <View style={styles.hostHeader}>
-                <Text style={styles.hostName}>Gospodyni: Anna</Text>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color="#10b981"
-                  style={{ marginLeft: 6 }}
-                />
-              </View>
-              <Text style={styles.hostSub}>Zweryfikowana · Zwykle odpisuje w 1 godz.</Text>
-            </View>
-          </View>
-
-          <Text style={styles.description}>
-            Spokojny garaż z wygodnym wjazdem na krakowskim Kazimierzu. Instrukcje wjazdu otrzymasz
-            po rezerwacji.
-          </Text>
 
           {/* Date Selector Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Wybierz termin</Text>
-            <Text style={styles.sectionPrice}>5 zł / godz.</Text>
+            <Text style={styles.sectionPrice}>{spot.hourlyPrice.toFixed(2)} zł / godz.</Text>
           </View>
 
           <View style={styles.monthRow}>
-            <Text style={styles.monthLabel}>Październik 2026</Text>
-            <View style={styles.monthArrows}>
-              <TouchableOpacity style={styles.arrowButton}>
-                <Feather name="chevron-left" size={16} color="#374151" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.arrowButton}>
-                <Feather name="chevron-right" size={16} color="#374151" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.monthLabel}>{new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(new Date(`${selectedDay}T12:00:00`))}</Text>
           </View>
 
           <ScrollView
@@ -155,12 +114,12 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
             style={styles.calendarStrip}
           >
             {days.map((item) => {
-              const isSelected = selectedDay === item.date;
+              const isSelected = selectedDay === item.key;
               return (
                 <TouchableOpacity
-                  key={item.date}
+                  key={item.key}
                   style={[styles.dayCard, isSelected && styles.selectedDayCard]}
-                  onPress={() => setSelectedDay(item.date)}
+                  onPress={() => setSelectedDay(item.key)}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.dayLabel, isSelected && styles.selectedDayText]}>
@@ -180,7 +139,6 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
               <Text style={styles.timeBoxLabel}>Przyjazd</Text>
               <View style={styles.timeValueRow}>
                 <Text style={styles.timeBoxValue}>10:00</Text>
-                <Feather name="chevron-down" size={16} color="#6b7280" />
               </View>
             </View>
 
@@ -188,22 +146,20 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
               <Text style={styles.timeBoxLabel}>Wyjazd</Text>
               <View style={styles.timeValueRow}>
                 <Text style={styles.timeBoxValue}>13:00</Text>
-                <Feather name="chevron-down" size={16} color="#6b7280" />
               </View>
             </View>
           </View>
 
-          <View style={styles.cancellationNotice}>
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={16}
-              color="#059669"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.cancellationText}>
-              Bezpłatne anulowanie do 1 godz. przed przyjazdem
-            </Text>
-          </View>
+          <TextInput
+            style={styles.plateInput}
+            placeholderTextColor={colors.placeholder}
+            placeholder="Numer rejestracyjny pojazdu"
+            value={vehiclePlateNumber}
+            onChangeText={setVehiclePlateNumber}
+            autoCapitalize="characters"
+            maxLength={50}
+          />
+
         </View>
       </ScrollView>
 
@@ -211,11 +167,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
       <View style={styles.bottomBarContainer}>
         <View style={styles.priceSummaryRow}>
           <View style={styles.priceSummary}>
-            <Text style={styles.calculationFormula}>3 godz. × 5 zł</Text>
-            <Text style={styles.serviceFeeNote}>W tym 2 zł opłaty serwisowej</Text>
+            <Text style={styles.calculationFormula}>3 godz. × {spot.hourlyPrice.toFixed(2)} zł</Text>
           </View>
           <View style={styles.totalBlock}>
-            <Text style={styles.totalPrice}>Razem 17 zł</Text>
+            <Text style={styles.totalPrice}>Razem {(3 * spot.hourlyPrice).toFixed(2)} zł</Text>
           </View>
         </View>
 
@@ -226,7 +181,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
           activeOpacity={0.85}
         >
           <Text style={styles.bookButtonText}>
-            {isSubmitting ? 'Przetwarzanie...' : 'Zarezerwuj i zapłać'}
+            {isSubmitting ? 'Przetwarzanie...' : 'Zarezerwuj'}
           </Text>
           <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
@@ -235,10 +190,18 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ spot, onBack, onBo
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  plateInput: {
+    borderWidth: 1,
+    borderColor: colors.strongBorder,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 16,
+    color: colors.text,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   scrollContent: {
     paddingBottom: 130,
@@ -250,7 +213,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   backButton: {
     flexDirection: 'row',
@@ -260,7 +223,7 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
   },
   topActions: {
     flexDirection: 'row',
@@ -272,7 +235,7 @@ const styles = StyleSheet.create({
   heroContainer: {
     width: '100%',
     height: 230,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
     position: 'relative',
   },
   heroImage: {
@@ -307,7 +270,7 @@ const styles = StyleSheet.create({
   typeBadge: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1b5e3a',
+    color: colors.accent,
     letterSpacing: 0.6,
   },
   ratingBox: {
@@ -317,12 +280,12 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 6,
     letterSpacing: -0.5,
   },
@@ -333,7 +296,7 @@ const styles = StyleSheet.create({
   },
   address: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.muted,
   },
   featuresRow: {
     flexDirection: 'row',
@@ -343,7 +306,7 @@ const styles = StyleSheet.create({
   featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -351,12 +314,12 @@ const styles = StyleSheet.create({
   featurePillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
   },
   hostCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     paddingVertical: 10,
     marginBottom: 16,
@@ -377,17 +340,17 @@ const styles = StyleSheet.create({
   hostName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   hostSub: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.muted,
     marginTop: 2,
   },
   description: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4b5563',
+    color: colors.secondary,
     marginBottom: 24,
   },
   sectionHeader: {
@@ -399,13 +362,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     letterSpacing: -0.4,
   },
   sectionPrice: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   monthRow: {
     flexDirection: 'row',
@@ -416,7 +379,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6b7280',
+    color: colors.muted,
   },
   monthArrows: {
     flexDirection: 'row',
@@ -432,25 +395,25 @@ const styles = StyleSheet.create({
   dayCard: {
     width: 54,
     height: 68,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.mutedSurface,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   selectedDayCard: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
   },
   dayLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: colors.muted,
     marginBottom: 4,
   },
   dateLabel: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   selectedDayText: {
     color: '#ffffff',
@@ -462,16 +425,16 @@ const styles = StyleSheet.create({
   },
   timeBox: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   timeBoxLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.muted,
     marginBottom: 4,
   },
   timeValueRow: {
@@ -482,7 +445,7 @@ const styles = StyleSheet.create({
   timeBoxValue: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   cancellationNotice: {
     flexDirection: 'row',
@@ -491,7 +454,7 @@ const styles = StyleSheet.create({
   },
   cancellationText: {
     fontSize: 12,
-    color: '#059669',
+    color: colors.success,
     fontWeight: '600',
   },
   bottomBarContainer: {
@@ -499,9 +462,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.subtleBorder,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
@@ -523,11 +486,11 @@ const styles = StyleSheet.create({
   calculationFormula: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.label,
   },
   serviceFeeNote: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: colors.placeholder,
     marginTop: 2,
   },
   totalBlock: {
@@ -536,10 +499,10 @@ const styles = StyleSheet.create({
   totalPrice: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#111827',
+    color: colors.text,
   },
   bookButton: {
-    backgroundColor: '#1b5e3a',
+    backgroundColor: colors.brand,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -547,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: colors.disabled,
   },
   bookButtonText: {
     color: '#ffffff',

@@ -5,6 +5,9 @@ import io.spotly.dto.LoginRequest;
 import io.spotly.dto.RegisterRequest;
 import io.spotly.entity.User;
 import io.spotly.repository.UserRepository;
+import io.spotly.repository.ParkingSpotRepository;
+import io.spotly.repository.BookingRepository;
+import io.spotly.repository.SpotAvailabilityRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -35,44 +39,41 @@ class AuthControllerTest {
     private UserRepository userRepository;
 
     @Autowired
+    private ParkingSpotRepository parkingSpotRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private SpotAvailabilityRepository spotAvailabilityRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        bookingRepository.deleteAll();
+        spotAvailabilityRepository.deleteAll();
+        parkingSpotRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("POST /api/v1/auth/login - should auto-create user in DB and return JWT if user does not exist")
-    void shouldAutoCreateUserOnLoginWhenUserDoesNotExist() throws Exception {
+    @DisplayName("POST /api/v1/auth/login - should reject unknown user without creating an account")
+    void shouldRejectUnknownUserOnLogin() throws Exception {
         LoginRequest request = LoginRequest.builder()
                 .email("newdriver@example.com")
                 .password("securePassword123")
                 .nickname("FastDriver")
                 .build();
 
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.access_token").isNotEmpty())
-                .andExpect(jsonPath("$.token_type").value("Bearer"))
-                .andExpect(jsonPath("$.expires_in_seconds").value(86400))
-                .andExpect(jsonPath("$.user.email").value("newdriver@example.com"))
-                .andExpect(jsonPath("$.user.nickname").value("FastDriver"))
-                .andExpect(jsonPath("$.user.first_name").value("FastDriver"))
-                .andExpect(jsonPath("$.user.role").value("USER"))
-                .andExpect(jsonPath("$.user.id").isNotEmpty())
-                .andReturn();
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
 
-        // Verify user was persisted in database
-        User createdUser = userRepository.findByEmail("newdriver@example.com").orElse(null);
-        assertThat(createdUser).isNotNull();
-        assertThat(createdUser.getNickname()).isEqualTo("FastDriver");
-        assertThat(createdUser.getRole()).isEqualTo("USER");
-        // Verify password is encrypted and not stored in plain text
-        assertThat(createdUser.getPassword()).isNotEqualTo("securePassword123");
-        assertThat(passwordEncoder.matches("securePassword123", createdUser.getPassword())).isTrue();
+        assertThat(userRepository.findByEmail("newdriver@example.com")).isEmpty();
     }
 
     @Test
@@ -197,17 +198,17 @@ class AuthControllerTest {
     @Test
     @DisplayName("GET /api/v1/auth/me - should return current user profile with valid JWT Bearer token")
     void shouldReturnCurrentUserWithBearerToken() throws Exception {
-        // 1. Auto-create user via login
-        LoginRequest loginRequest = LoginRequest.builder()
+        // 1. Register user before authenticating
+        RegisterRequest registerRequest = RegisterRequest.builder()
                 .email("jwtuser@example.com")
                 .password("validPassword123")
                 .nickname("JwtMaster")
                 .build();
 
-        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk())
+                        .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isCreated())
                 .andReturn();
 
         String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
@@ -259,6 +260,18 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("OPTIONS /api/v1/auth/login - should handle preflight CORS requests from localhost:8082")
+    void shouldHandleCorsPreflightRequest() throws Exception {
+        mockMvc.perform(options("/api/v1/auth/login")
+                        .header("Origin", "http://localhost:8082")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:8082"))
+                .andExpect(header().string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("POST")));
     }
 }
 

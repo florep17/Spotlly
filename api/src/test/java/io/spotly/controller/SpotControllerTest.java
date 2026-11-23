@@ -56,6 +56,25 @@ class SpotControllerTest {
     private String host1Token;
     private String host2Token;
 
+    @Test
+    void mapListsOtherOwnersSpotsWithoutGateCodes() throws Exception {
+        // Hosts are initialized in setUp before this test runs.
+        parkingSpotRepository.save(ParkingSpot.builder()
+                .owner(host2).title("Public listing")
+                .latitude(new BigDecimal("50.0614000")).longitude(new BigDecimal("19.9383000"))
+                .addressStreet("Pawia 5").addressCity("Kraków")
+                .spotType("GARAGE").maxVehicleSize("SUV")
+                .accessType("CODE_KEYPAD").gatePinCode("private-pin")
+                .hourlyRate(new BigDecimal("8.50")).isActive(true).build());
+
+        mockMvc.perform(get("/api/v1/spots/all").header("Authorization", host1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Public listing"))
+                .andExpect(jsonPath("$[0].latitude").value(50.0614))
+                .andExpect(jsonPath("$[0].gate_pin_code").doesNotExist());
+    }
+
     @BeforeEach
     void setUp() {
         parkingSpotRepository.deleteAll();

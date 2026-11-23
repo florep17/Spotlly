@@ -28,8 +28,8 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(
-            summary = "Login or auto-register with email & password",
-            description = "Authenticates an existing user with email and password, or creates a new user account if not found in database."
+            summary = "Login with email and password",
+            description = "Authenticates an existing user with email and password."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Authentication successful, Spotly Bearer token returned"),

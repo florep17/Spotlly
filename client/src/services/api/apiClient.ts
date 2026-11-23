@@ -25,7 +25,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  endpoint: string,
+  { includeSession = true, ...options }: RequestInit & { includeSession?: boolean } = {}
+): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const customHeaders = (options.headers || {}) as Record<string, string>;
 
@@ -35,7 +38,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     ...customHeaders,
   };
 
-  if (currentAuthToken && !headers['Authorization']) {
+  if (includeSession && currentAuthToken && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${currentAuthToken}`;
   }
 

@@ -2,6 +2,7 @@ package io.spotly.controller;
 
 import io.spotly.dto.spot.SpotRequest;
 import io.spotly.dto.spot.SpotResponse;
+import io.spotly.dto.spot.PublicSpotResponse;
 import io.spotly.service.SpotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -86,17 +87,14 @@ public class SpotController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/all")
     @Operation(
-            summary = "Get parking spot by ID",
-            description = "Returns spot details."
+            summary = "Get all active parking spots",
+            description = "Returns all active parking spots in the system (for map display)."
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Spot found"),
-            @ApiResponse(responseCode = "404", description = "Spot not found")
-    })
-    public ResponseEntity<SpotResponse> getSpotById(@PathVariable UUID id) {
-        return ResponseEntity.ok(spotService.getSpotById(id));
+    @ApiResponse(responseCode = "200", description = "List of all active spots")
+    public ResponseEntity<List<PublicSpotResponse>> getAllSpots() {
+        return ResponseEntity.ok(spotService.getAllActiveSpots());
     }
 
     @GetMapping
@@ -108,6 +106,19 @@ public class SpotController {
     public ResponseEntity<List<SpotResponse>> getMySpots(@AuthenticationPrincipal Jwt jwt) {
         String ownerId = jwt.getSubject();
         return ResponseEntity.ok(spotService.getMySpots(ownerId));
+    }
+
+    @GetMapping("/{id:[a-fA-F0-9\\-]{36}}")
+    @Operation(
+            summary = "Get parking spot by ID",
+            description = "Returns spot details."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Spot found"),
+            @ApiResponse(responseCode = "404", description = "Spot not found")
+    })
+    public ResponseEntity<PublicSpotResponse> getSpotById(@PathVariable UUID id) {
+        return ResponseEntity.ok(spotService.getSpotById(id));
     }
 }
 

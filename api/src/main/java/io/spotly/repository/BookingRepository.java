@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface BookingRepository extends JpaRepository<Booking, String> {
     List<Booking> findByDriverId(String driverId);
     List<Booking> findBySpotId(UUID spotId);
+    boolean existsBySpotId(UUID spotId);
 
     @Query("""
         SELECT b FROM Booking b
